@@ -315,7 +315,7 @@ class Event(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     session_id = Column(String(100))
     event_type = Column(String(50), nullable=False)  # search, product_click, add_to_cart, etc.
-    metadata = Column(JSON)
+    event_metadata = Column("metadata", String)
     ip_address = Column(String(50))
     user_agent = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
