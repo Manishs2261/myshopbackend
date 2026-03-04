@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Any, Dict
 from datetime import datetime
 from decimal import Decimal
+import re
 
 
 # ─── Auth ──────────────────────────────────────────────────────────────────
@@ -23,6 +24,130 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
+# ─── Customer Registration ──────────────────────────────────────────────────
+
+class CustomerRegisterRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    email: EmailStr
+    phone: str = Field(..., min_length=10, max_length=15)
+    password: str = Field(..., min_length=6, max_length=100)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if not re.match(r"^[6-9]\d{9}$", v.replace("+91", "").replace(" ", "")):
+            raise ValueError("Enter a valid 10-digit Indian mobile number")
+        return v
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
+
+class CustomerLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+# ─── Vendor Registration ────────────────────────────────────────────────────
+
+class VendorRegisterRequest(BaseModel):
+    # Personal info
+    name: str = Field(..., min_length=2, max_length=100)
+    email: EmailStr
+    phone: str = Field(..., min_length=10, max_length=15)
+    password: str = Field(..., min_length=6, max_length=100)
+
+    # Business info
+    business_name: Optional[str] = None
+    business_email: Optional[EmailStr] = None
+    business_phone: Optional[str] = None
+    gst_number: Optional[str] = None
+    pan_number: Optional[str] = None
+
+    @field_validator("phone", "business_phone")
+    @classmethod
+    def validate_phone(cls, v):
+        if v is None:
+            return v
+        cleaned = v.replace("+91", "").replace(" ", "")
+        if not re.match(r"^[6-9]\d{9}$", cleaned):
+            raise ValueError("Enter a valid 10-digit Indian mobile number")
+        return v
+
+    # @field_validator("gst_number")
+    # @classmethod
+    # def validate_gst(cls, v):
+    #     if v and not re.match(r"^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z\d]{1}[Z]{1}[A-Z\d]{1}$", v):
+    #         raise ValueError("Invalid GST number format (e.g. 27AAPFU0939F1ZV)")
+    #     return v
+    #
+    # @field_validator("pan_number")
+    # @classmethod
+    # def validate_pan(cls, v):
+    #     if v and not re.match(r"^[A-Z]{5}[0-9]{4}[A-Z]{1}$", v):
+    #         raise ValueError("Invalid PAN number format (e.g. ABCDE1234F)")
+    #     return v
+
+
+class VendorLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+# ─── OTP / Phone Auth ───────────────────────────────────────────────────────
+
+class SendOTPRequest(BaseModel):
+    phone: str = Field(..., min_length=10, max_length=15)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v):
+        cleaned = v.replace("+91", "").replace(" ", "")
+        if not re.match(r"^[6-9]\d{9}$", cleaned):
+            raise ValueError("Enter a valid 10-digit Indian mobile number")
+        return cleaned
+
+
+class VerifyOTPRequest(BaseModel):
+    phone: str
+    otp: str = Field(..., min_length=4, max_length=6)
+    role: Optional[str] = "USER"  # USER or VENDOR
+
+
+# ─── Password Management ────────────────────────────────────────────────────
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v):
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(..., min_length=6)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v):
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number")
+        return v
+
+
 # ─── User ──────────────────────────────────────────────────────────────────
 
 class UserBase(BaseModel):
@@ -38,13 +163,15 @@ class UserUpdate(UserBase):
 
 class UserResponse(BaseModel):
     id: int
-    firebase_uid: str
+    firebase_uid: Optional[str] = None
     name: Optional[str]
     email: Optional[str]
     phone: Optional[str]
     role: str
     status: str
     avatar_url: Optional[str]
+    is_email_verified: Optional[bool] = False
+    is_phone_verified: Optional[bool] = False
     created_at: Optional[datetime]
 
     class Config:

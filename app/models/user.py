@@ -76,10 +76,17 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    firebase_uid = Column(String(128), unique=True, index=True, nullable=False)
+    firebase_uid = Column(String(128), unique=True, index=True, nullable=True)  # nullable for direct auth
     name = Column(String(200))
-    email = Column(String(200), unique=True, index=True)
-    phone = Column(String(20))
+    email = Column(String(200), unique=True, index=True, nullable=True)
+    phone = Column(String(20), unique=True, index=True, nullable=True)
+    hashed_password = Column(String(256), nullable=True)          # for email/password auth
+    otp_code = Column(String(10), nullable=True)                  # for phone OTP
+    otp_expires_at = Column(DateTime(timezone=True), nullable=True)
+    password_reset_token = Column(String(200), nullable=True)
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)
+    is_email_verified = Column(Boolean, default=False)
+    is_phone_verified = Column(Boolean, default=False)
     role = Column(String(20), default=UserRole.USER)
     status = Column(String(20), default=UserStatus.ACTIVE)
     avatar_url = Column(String(500))
