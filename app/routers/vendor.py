@@ -64,8 +64,8 @@ async def create_shop(
     vendor = result.scalar_one_or_none()
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor profile not found")
-    if vendor.status != "approved":
-        raise HTTPException(status_code=403, detail="Vendor not approved yet")
+    if vendor.status == "suspended":
+        raise HTTPException(status_code=403, detail="Vendor account suspended. Contact support.")
 
     # Check if shop already exists
     result = await db.execute(select(Shop).where(Shop.vendor_id == vendor.id))

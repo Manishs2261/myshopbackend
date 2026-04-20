@@ -214,19 +214,19 @@ class VendorResponse(BaseModel):
 
 class ShopCreate(BaseModel):
     name: str
-    description: Optional[str]
-    address: Optional[str]
-    city: Optional[str]
-    state: Optional[str]
+    description: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
     country: Optional[str] = "India"
-    pincode: Optional[str]
-    latitude: Optional[float]
-    longitude: Optional[float]
-    logo_url: Optional[str]
-    banner_url: Optional[str]
-    opening_time: Optional[str]
-    closing_time: Optional[str]
-    working_days: Optional[List[str]]
+    pincode: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
+    opening_time: Optional[str] = None
+    closing_time: Optional[str] = None
+    working_days: Optional[List[str]] = None
 
 
 class ShopUpdate(ShopCreate):
