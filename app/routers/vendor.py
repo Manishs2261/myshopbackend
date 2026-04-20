@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
+from typing import List
 from app.core.database import get_db
 from app.core.security import require_role
 from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout
@@ -111,6 +112,122 @@ async def update_shop(
     await db.commit()
     await db.refresh(shop)
     return shop
+
+
+# Media Upload Endpoints
+
+@router.post("/shop/logo", response_model=dict)
+async def upload_logo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+    
+    # Get shop
+    result = await db.execute(select(Shop).where(Shop.vendor_id == vendor.id))
+    shop = result.scalar_one_or_none()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    
+    # Save file (in production, use cloud storage)
+    # For now, return a mock URL
+    logo_url = f"http://localhost:8000/uploads/logos/{vendor.id}_{file.filename}"
+    
+    # Update shop
+    shop.logo_url = logo_url
+    await db.commit()
+    
+    return {"url": logo_url}
+
+
+@router.post("/shop/banner", response_model=dict)
+async def upload_banner(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+    
+    # Get shop
+    result = await db.execute(select(Shop).where(Shop.vendor_id == vendor.id))
+    shop = result.scalar_one_or_none()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    
+    # Validate file type
+    if not file.content_type or not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    
+    # Save file (in production, use cloud storage)
+    # For now, return a mock URL
+    banner_url = f"http://localhost:8000/uploads/banners/{vendor.id}_{file.filename}"
+    
+    # Update shop
+    shop.banner_url = banner_url
+    await db.commit()
+    
+    return {"url": banner_url}
+
+
+@router.post("/shop/gallery", response_model=dict)
+async def upload_gallery(
+    files: List[UploadFile] = File(...),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+    
+    # Get shop
+    result = await db.execute(select(Shop).where(Shop.vendor_id == vendor.id))
+    shop = result.scalar_one_or_none()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    
+    # Validate files
+    urls = []
+    current_gallery = shop.gallery or []
+    
+    for file in files:
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="Only image files are allowed")
+        
+        # Save file (in production, use cloud storage)
+        # For now, return a mock URL
+        url = f"http://localhost:8000/uploads/gallery/{vendor.id}_{file.filename}"
+        urls.append(url)
+    
+    # Update shop gallery
+    shop.gallery = current_gallery + urls
+    await db.commit()
+    
+    return {"urls": urls}
+
+
+@router.delete("/shop/gallery")
+async def remove_gallery_image(
+    url: str = Body(...),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+    
+    # Get shop
+    result = await db.execute(select(Shop).where(Shop.vendor_id == vendor.id))
+    shop = result.scalar_one_or_none()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    
+    # Remove URL from gallery
+    if shop.gallery and url in shop.gallery:
+        shop.gallery.remove(url)
+        await db.commit()
+    
+    return {"message": "Image removed from gallery"}
 
 
 # ─── Products ────────────────────────────────────────────────────────────────

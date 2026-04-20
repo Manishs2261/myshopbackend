@@ -247,6 +247,7 @@ class ShopResponse(BaseModel):
     longitude: Optional[float]
     logo_url: Optional[str]
     banner_url: Optional[str]
+    gallery: Optional[List[str]]
     status: str
     opening_time: Optional[str]
     closing_time: Optional[str]

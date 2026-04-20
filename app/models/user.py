@@ -140,6 +140,7 @@ class Shop(Base):
     longitude = Column(Float)
     logo_url = Column(String(500))
     banner_url = Column(String(500))
+    gallery = Column(JSON)  # Store array of image URLs
     status = Column(String(20), default=ShopStatus.ACTIVE)
     opening_time = Column(String(10))
     closing_time = Column(String(10))
