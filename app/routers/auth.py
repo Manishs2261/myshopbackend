@@ -63,6 +63,18 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
+def can_claim_phone_placeholder(user: User) -> bool:
+    """
+    OTP flow creates a minimal user row with only a phone number.
+    Allow email/password signup to complete that placeholder account.
+    """
+    return (
+        user.email is None
+        and user.hashed_password is None
+        and user.name is None
+    )
+
+
 def make_tokens(user: User) -> TokenResponse:
     data = {"sub": str(user.id), "role": user.role}
     return TokenResponse(
@@ -119,20 +131,29 @@ async def register_customer(
         raise HTTPException(status_code=409, detail="Email already registered. Please login.")
 
     result = await db.execute(select(User).where(User.phone == payload.phone))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Phone number already registered.")
+    user = result.scalar_one_or_none()
+    if user:
+        if not can_claim_phone_placeholder(user):
+            raise HTTPException(status_code=409, detail="Phone number already registered.")
 
-    user = User(
-        name=payload.name,
-        email=payload.email,
-        phone=payload.phone,
-        hashed_password=hash_password(payload.password),
-        role="USER",
-        status="active",
-        is_email_verified=False,
-        is_phone_verified=False,
-    )
-    db.add(user)
+        user.name = payload.name
+        user.email = payload.email
+        user.hashed_password = hash_password(payload.password)
+        user.role = "USER"
+        user.status = user.status or "active"
+        user.is_email_verified = False
+    else:
+        user = User(
+            name=payload.name,
+            email=payload.email,
+            phone=payload.phone,
+            hashed_password=hash_password(payload.password),
+            role="USER",
+            status="active",
+            is_email_verified=False,
+            is_phone_verified=False,
+        )
+        db.add(user)
     await db.commit()
     await db.refresh(user)
     return make_tokens(user)
@@ -208,35 +229,55 @@ async def register_vendor(
         raise HTTPException(status_code=409, detail="Email already registered. Please login.")
 
     result = await db.execute(select(User).where(User.phone == payload.phone))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Phone number already registered.")
+    user = result.scalar_one_or_none()
+    if user:
+        if not can_claim_phone_placeholder(user):
+            raise HTTPException(status_code=409, detail="Phone number already registered.")
 
-    # Create user
-    user = User(
-        name=payload.name,
-        email=payload.email,
-        phone=payload.phone,
-        hashed_password=hash_password(payload.password),
-        role="VENDOR",
-        status="active",
-        is_email_verified=False,
-        is_phone_verified=False,
-    )
-    db.add(user)
+        user.name = payload.name
+        user.email = payload.email
+        user.hashed_password = hash_password(payload.password)
+        user.role = "VENDOR"
+        user.status = user.status or "active"
+        user.is_email_verified = False
+    else:
+        # Create user
+        user = User(
+            name=payload.name,
+            email=payload.email,
+            phone=payload.phone,
+            hashed_password=hash_password(payload.password),
+            role="VENDOR",
+            status="active",
+            is_email_verified=False,
+            is_phone_verified=False,
+        )
+        db.add(user)
     await db.flush()
 
-    # Create vendor record (PENDING approval)
-    vendor = Vendor(
-        user_id=user.id,
-        business_name=payload.business_name,
-        business_email=payload.business_email or payload.email,
-        business_phone=payload.business_phone or payload.phone,
-        gst_number=payload.gst_number,
-        pan_number=payload.pan_number,
-        status="pending",
-        verified=False,
-    )
-    db.add(vendor)
+    result = await db.execute(select(Vendor).where(Vendor.user_id == user.id))
+    vendor = result.scalar_one_or_none()
+    if vendor:
+        vendor.business_name = payload.business_name or vendor.business_name
+        vendor.business_email = payload.business_email or payload.email
+        vendor.business_phone = payload.business_phone or payload.phone
+        vendor.gst_number = payload.gst_number
+        vendor.pan_number = payload.pan_number
+        vendor.status = "pending"
+        vendor.verified = False
+    else:
+        # Create vendor record (PENDING approval)
+        vendor = Vendor(
+            user_id=user.id,
+            business_name=payload.business_name or "My Shop",
+            business_email=payload.business_email or payload.email,
+            business_phone=payload.business_phone or payload.phone,
+            gst_number=payload.gst_number,
+            pan_number=payload.pan_number,
+            status="pending",
+            verified=False,
+        )
+        db.add(vendor)
     await db.commit()
     await db.refresh(user)
     return make_tokens(user)
