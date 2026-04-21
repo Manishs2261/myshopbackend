@@ -48,9 +48,25 @@ async def get_categories(
         query = query.where(Category.parent_id == parent_id)
     else:
         query = query.where(Category.parent_id == None)
-    query = query.options(selectinload(Category.children)).order_by(Category.sort_order)
+    query = query.order_by(Category.sort_order)
     result = await db.execute(query)
-    return result.scalars().all()
+    categories = result.scalars().all()
+    
+    # Manually build response to avoid circular reference
+    response = []
+    for cat in categories:
+        response.append({
+            "id": cat.id,
+            "name": cat.name,
+            "slug": cat.slug,
+            "description": cat.description,
+            "image_url": cat.image_url,
+            "parent_id": cat.parent_id,
+            "is_active": cat.is_active,
+            "sort_order": cat.sort_order,
+            "children": []
+        })
+    return response
 
 
 # ─── Products ────────────────────────────────────────────────────────────────

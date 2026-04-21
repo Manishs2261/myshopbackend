@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Body, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -242,24 +242,51 @@ async def get_vendor(user: User, db: AsyncSession) -> Vendor:
 
 @router.post("/products", response_model=ProductResponse, status_code=201)
 async def create_product(
-    payload: ProductCreate,
+    data: str = Form(...),
+    images: List[UploadFile] = File(default=[]),
+    video: UploadFile = File(None),
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
     vendor = await get_vendor(current_user, db)
 
-    product_data = payload.model_dump(exclude={"variants"})
-    product_data["vendor_id"] = vendor.id
-    product_data["slug"] = slugify(payload.name)
-    product_data["status"] = "pending"
+    # Parse JSON data from form
+    import json
+    product_data = json.loads(data)
+    
+    # Handle image uploads (for now, just create mock URLs)
+    image_urls = []
+    for i, image in enumerate(images):
+        # In production, save to cloud storage
+        image_url = f"http://localhost:8000/uploads/products/{vendor.id}_{i}_{image.filename}"
+        image_urls.append(image_url)
+    
+    # Handle video upload
+    video_url = None
+    if video:
+        video_url = f"http://localhost:8000/uploads/products/{vendor.id}_video_{video.filename}"
 
-    product = Product(**product_data)
+    # Create product
+    product_dict = {
+        **product_data,
+        "vendor_id": vendor.id,
+        "slug": slugify(product_data["name"]),
+        "status": "pending",
+        "images": image_urls,
+        "video": video_url,
+    }
+    
+    # Remove variants from main product data
+    variants = product_dict.pop("variants", [])
+    
+    product = Product(**product_dict)
     db.add(product)
     await db.flush()
 
-    if payload.variants:
-        for v in payload.variants:
-            variant = ProductVariant(product_id=product.id, **v.model_dump())
+    # Add variants
+    if variants:
+        for v in variants:
+            variant = ProductVariant(product_id=product.id, **v)
             db.add(variant)
 
     await db.commit()
@@ -267,7 +294,6 @@ async def create_product(
 
     result = await db.execute(
         select(Product).where(Product.id == product.id)
-        .options(selectinload(Product.variants))
     )
     return result.scalar_one()
 
