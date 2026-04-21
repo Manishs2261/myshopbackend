@@ -33,7 +33,7 @@ async def seed():
         # Create admin user
         from sqlalchemy import select
         result = await db.execute(select(User).where(User.role == "ADMIN"))
-        if not result.scalar_one_or_none():
+        if not result.scalars().all():
             admin = User(
                 firebase_uid="admin_seed_uid",
                 name="Admin",
