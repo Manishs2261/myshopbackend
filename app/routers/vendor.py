@@ -266,34 +266,68 @@ async def create_product(
     if video:
         video_url = f"http://localhost:8000/uploads/products/{vendor.id}_video_{video.filename}"
 
-    # Create product
+    # Generate unique slug
+    base_slug = slugify(product_data["name"])
+    unique_slug = f"{base_slug}-{vendor.id}"
+    
+    # Check if slug exists and add timestamp if needed
+    existing_slug = await db.execute(
+        select(Product).where(Product.slug == unique_slug)
+    )
+    if existing_slug.scalar_one_or_none():
+        import time
+        unique_slug = f"{base_slug}-{vendor.id}-{int(time.time())}"
+    
+    # Extract variants before creating product
+    variants = product_data.get("variants", [])
+    
+    # Create product with only valid Product fields
     product_dict = {
-        **product_data,
         "vendor_id": vendor.id,
-        "slug": slugify(product_data["name"]),
+        "slug": unique_slug,
         "status": "pending",
         "images": image_urls,
-        "video": video_url,
+        # Only include fields that exist in Product model
+        "name": product_data.get("name"),
+        "description": product_data.get("description"),
+        "brand": product_data.get("brand"),
+        "category_id": int(product_data.get("category_id", 0)) if product_data.get("category_id") else None,
+        "price": float(product_data.get("price", 0)),
+        "stock": int(product_data.get("stock", 0)),
+        "tags": product_data.get("tags", []),
     }
     
-    # Remove variants from main product data
-    variants = product_dict.pop("variants", [])
-    
-    product = Product(**product_dict)
-    db.add(product)
-    await db.flush()
+    try:
+        product = Product(**product_dict)
+        db.add(product)
+        await db.flush()
 
-    # Add variants
-    if variants:
-        for v in variants:
-            variant = ProductVariant(product_id=product.id, **v)
-            db.add(variant)
+        # Add variants with proper data handling
+        if variants:
+            for v in variants:
+                # Ensure variant data is properly structured
+                variant_data = {
+                    "product_id": product.id,
+                    "color": v.get("color"),
+                    "hex": v.get("hex"),
+                    "stock": int(v.get("stock", 0)),
+                    "images": v.get("images", []),
+                }
+                # Only add variant if it has meaningful data
+                if variant_data["color"] or variant_data["stock"] > 0:
+                    variant = ProductVariant(**variant_data)
+                    db.add(variant)
 
-    await db.commit()
-    await db.refresh(product)
+        await db.commit()
+        await db.refresh(product)
+    except Exception as e:
+        await db.rollback()
+        print(f"Error creating product: {e}")
+        print(f"Product data: {product_dict}")
+        raise HTTPException(status_code=500, detail=f"Failed to create product: {str(e)}")
 
     result = await db.execute(
-        select(Product).where(Product.id == product.id)
+        select(Product).where(Product.id == product.id).options(selectinload(Product.variants))
     )
     return result.scalar_one()
 
