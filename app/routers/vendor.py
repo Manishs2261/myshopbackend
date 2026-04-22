@@ -254,11 +254,27 @@ async def create_product(
     import json
     product_data = json.loads(data)
     
-    # Handle image uploads (for now, just create mock URLs)
+    # Handle image uploads - save actual files
     image_urls = []
+    import os
+    from pathlib import Path
+    
+    # Create uploads directory if it doesn't exist
+    uploads_dir = Path("uploads/products")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    
     for i, image in enumerate(images):
-        # In production, save to cloud storage
-        image_url = f"http://localhost:8000/uploads/products/{vendor.id}_{i}_{image.filename}"
+        # Generate unique filename
+        filename = f"{vendor.id}_{i}_{image.filename}"
+        file_path = uploads_dir / filename
+        
+        # Save the file
+        content = await image.read()
+        with open(file_path, "wb") as f:
+            f.write(content)
+        
+        # Create URL for the saved image
+        image_url = f"http://localhost:8000/uploads/products/{filename}"
         image_urls.append(image_url)
     
     # Handle video upload
@@ -285,7 +301,7 @@ async def create_product(
     product_dict = {
         "vendor_id": vendor.id,
         "slug": unique_slug,
-        "status": "pending",
+        "status": "active",
         "images": image_urls,
         # Only include fields that exist in Product model
         "name": product_data.get("name"),
@@ -308,8 +324,10 @@ async def create_product(
                 # Ensure variant data is properly structured
                 variant_data = {
                     "product_id": product.id,
+                    "size": v.get("size"),
                     "color": v.get("color"),
-                    "hex": v.get("hex"),
+                    "sku": v.get("sku"),  # Add SKU field
+                    "price": float(v.get("price", 0)) if v.get("price") else None,
                     "stock": int(v.get("stock", 0)),
                     "images": v.get("images", []),
                 }
@@ -352,7 +370,46 @@ async def list_vendor_products(
     result = await db.execute(
         query.offset(offset).limit(limit).options(selectinload(Product.variants))
     )
-    items = result.scalars().all()
+    products = result.scalars().all()
+    
+    # Convert Product objects to dictionaries for serialization
+    items = []
+    for product in products:
+        product_dict = {
+            "id": product.id,
+            "vendor_id": product.vendor_id,
+            "category_id": product.category_id,
+            "name": product.name,
+            "slug": product.slug,
+            "description": product.description,
+            "brand": product.brand,
+            "price": float(product.price),
+            "original_price": float(product.original_price) if product.original_price else None,
+            "stock": product.stock,
+            "unit": product.unit,
+            "status": product.status,
+            "rating": product.rating,
+            "review_count": product.review_count,
+            "images": product.images or [],
+            "tags": product.tags or [],
+            "specifications": product.specifications or {},
+            "is_featured": product.is_featured,
+            "view_count": product.view_count,
+            "variants": [
+                {
+                    "id": v.id,
+                    "size": v.size,
+                    "color": v.color,
+                    "sku": v.sku,
+                    "price": float(v.price) if v.price else None,
+                    "stock": v.stock,
+                    "images": v.images or []
+                }
+                for v in product.variants
+            ],
+            "created_at": product.created_at.isoformat() if product.created_at else None
+        }
+        items.append(product_dict)
 
     return PaginatedResponse(
         items=items, total=total, page=page, limit=limit,
