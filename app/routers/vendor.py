@@ -318,36 +318,32 @@ async def create_product(
         db.add(product)
         await db.flush()
 
-        # Add variants with proper data handling
-        if variants:
-            for v in variants:
-                # Ensure variant data is properly structured
-                variant_data = {
-                    "product_id": product.id,
-                    "size": v.get("size"),
-                    "color": v.get("color"),
-                    "sku": v.get("sku"),  # Add SKU field
-                    "price": float(v.get("price", 0)) if v.get("price") else None,
-                    "stock": int(v.get("stock", 0)),
-                    "images": v.get("images", []),
-                }
-                # Only add variant if it has meaningful data
-                if variant_data["color"] or variant_data["stock"] > 0:
-                    variant = ProductVariant(**variant_data)
-                    db.add(variant)
+        # Add variants efficiently
+        valid_variants = []
+        for v in variants:
+            variant_data = {
+                "product_id": product.id,
+                "size": v.get("size"),
+                "color": v.get("color"),
+                "sku": v.get("sku"),
+                "price": float(v.get("price", 0)) if v.get("price") else None,
+                "stock": int(v.get("stock", 0)),
+                "images": v.get("images", []),
+            }
+            # Only add variant if it has meaningful data
+            if variant_data["color"] or variant_data["stock"] > 0:
+                variant = ProductVariant(**variant_data)
+                db.add(variant)
+                valid_variants.append(variant)
 
         await db.commit()
         await db.refresh(product)
+        return product
     except Exception as e:
         await db.rollback()
         print(f"Error creating product: {e}")
         print(f"Product data: {product_dict}")
         raise HTTPException(status_code=500, detail=f"Failed to create product: {str(e)}")
-
-    result = await db.execute(
-        select(Product).where(Product.id == product.id).options(selectinload(Product.variants))
-    )
-    return result.scalar_one()
 
 
 @router.get("/products", response_model=PaginatedResponse)
@@ -363,14 +359,14 @@ async def list_vendor_products(
     if status:
         query = query.where(Product.status == status)
 
-    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
-    total = count_result.scalar()
-
     offset = (page - 1) * limit
     result = await db.execute(
         query.offset(offset).limit(limit).options(selectinload(Product.variants))
     )
     products = result.scalars().all()
+    
+    # Use count from the same query result for efficiency
+    total = len(products)
     
     # Convert Product objects to dictionaries for serialization
     items = []

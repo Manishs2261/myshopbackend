@@ -309,7 +309,7 @@ async def login_vendor(
     if user.status == "blocked":
         raise HTTPException(status_code=403, detail="Account blocked. Contact support.")
     if user.role not in ("VENDOR", "ADMIN"):
-        raise HTTPException(status_code=403, detail="Please use customer login.")
+        raise HTTPException(status_code=403, detail="Vendor access required. Please use vendor login.")
 
     result = await db.execute(select(Vendor).where(Vendor.user_id == user.id))
     vendor = result.scalar_one_or_none()
