@@ -13,7 +13,7 @@ from app.schemas.schemas import (
     ShopCreate, ShopUpdate, ShopResponse,
     ProductCreate, ProductUpdate, ProductResponse,
     OrderResponse, OrderStatusUpdate, PaginatedResponse,
-    PayoutRequest, PayoutResponse, VendorDashboard
+    PayoutRequest, PayoutResponse, VendorDashboard, VendorDashboardOverview
 )
 from slugify import slugify
 import math
@@ -831,7 +831,24 @@ async def update_order_status(
 
 # ─── Analytics ──────────────────────────────────────────────────────────────
 
-@router.get("/analytics/dashboard", response_model=VendorDashboard)
+def _calculate_vendor_completion_score(user: User, vendor: Vendor, shop: Shop | None, total_products: int) -> int:
+    checks = [
+        bool(vendor.business_name),
+        bool(vendor.business_email),
+        bool(vendor.business_phone),
+        bool(vendor.gst_number or vendor.pan_number),
+        bool(shop and shop.name),
+        bool(shop and shop.logo_url),
+        bool(shop and shop.address),
+        bool(user.is_email_verified),
+        bool(user.is_phone_verified),
+        total_products >= 5,
+    ]
+    return round((sum(1 for item in checks if item) / len(checks)) * 100)
+
+
+@router.get("/dashboard", response_model=VendorDashboardOverview)
+@router.get("/analytics/dashboard", response_model=VendorDashboardOverview)
 async def vendor_dashboard(
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
@@ -869,15 +886,48 @@ async def vendor_dashboard(
     )
     total_products = products_result.scalar() or 0
 
-    conversion_rate = (total_orders / max(total_views, 1)) * 100
+    active_products_result = await db.execute(
+        select(func.count(Product.id)).where(Product.vendor_id == vendor.id, Product.status == "active")
+    )
+    active_products = active_products_result.scalar() or 0
+    inactive_products = max(total_products - active_products, 0)
 
-    return VendorDashboard(
+    shop_result = await db.execute(select(Shop).where(Shop.vendor_id == vendor.id))
+    shop = shop_result.scalar_one_or_none()
+    completion_score = _calculate_vendor_completion_score(current_user, vendor, shop, total_products)
+
+    recent_products_result = await db.execute(
+        select(Product)
+        .where(Product.vendor_id == vendor.id)
+        .options(selectinload(Product.category))
+        .order_by(func.coalesce(Product.updated_at, Product.created_at).desc())
+        .limit(5)
+    )
+    recent_products = recent_products_result.scalars().all()
+
+    return VendorDashboardOverview(
+        total_products=total_products,
+        active_products=active_products,
+        inactive_products=inactive_products,
         total_views=total_views,
         total_orders=total_orders,
-        revenue=revenue,
-        conversion_rate=round(conversion_rate, 2),
         pending_orders=pending_orders,
-        total_products=total_products,
+        revenue=revenue,
+        completion_score=completion_score,
+        recent_products=[
+            {
+                "id": product.id,
+                "name": product.name,
+                "category_name": product.category.name if product.category else None,
+                "price": product.price,
+                "status": product.status,
+                "click_count": product.view_count or 0,
+                "images": product.images or [],
+                "created_at": product.created_at,
+                "updated_at": product.updated_at,
+            }
+            for product in recent_products
+        ],
     )
 
 

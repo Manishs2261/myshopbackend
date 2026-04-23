@@ -627,6 +627,30 @@ class VendorDashboard(BaseModel):
     total_products: int
 
 
+class VendorDashboardRecentProduct(BaseModel):
+    id: int
+    name: str
+    category_name: Optional[str] = None
+    price: Decimal
+    status: str
+    click_count: int = 0
+    images: List[str] = []
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class VendorDashboardOverview(BaseModel):
+    total_products: int
+    active_products: int
+    inactive_products: int
+    total_views: int
+    total_orders: int
+    pending_orders: int
+    revenue: Decimal
+    completion_score: int
+    recent_products: List[VendorDashboardRecentProduct] = []
+
+
 class AdminAnalytics(BaseModel):
     total_users: int
     total_vendors: int
