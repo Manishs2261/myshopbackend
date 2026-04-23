@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import List
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -26,6 +27,19 @@ class Settings(BaseSettings):
     APP_NAME: str = "LocalShop"
     DEBUG: bool = True
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"true", "1", "yes", "on", "debug", "development"}:
+                return True
+            if normalized in {"false", "0", "no", "off", "release", "production"}:
+                return False
+        return value
 
     @property
     def cors_origins(self) -> List[str]:

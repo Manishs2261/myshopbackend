@@ -319,6 +319,7 @@ class ProductCreate(BaseModel):
     brand: Optional[str]
     price: Decimal
     original_price: Optional[Decimal]
+    discount_percentage: Optional[int]
     stock: int = 0
     unit: Optional[str]
     images: Optional[List[str]]
@@ -334,6 +335,7 @@ class ProductUpdate(BaseModel):
     brand: Optional[str]
     price: Optional[Decimal]
     original_price: Optional[Decimal]
+    discount_percentage: Optional[int]
     stock: Optional[int]
     unit: Optional[str]
     images: Optional[List[str]]
@@ -351,6 +353,7 @@ class ProductResponse(BaseModel):
     brand: Optional[str]
     price: Decimal
     original_price: Optional[Decimal]
+    discount_percentage: Optional[int]
     stock: int
     unit: Optional[str]
     status: str
@@ -375,6 +378,7 @@ class ProductListResponse(BaseModel):
     name: str
     price: Decimal
     original_price: Optional[Decimal]
+    discount_percentage: Optional[int]
     stock: int
     status: str
     rating: float

@@ -74,6 +74,22 @@ async def value_error_handler(request: Request, exc: ValueError):
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
+@app.exception_handler(UnicodeDecodeError)
+async def unicode_decode_error_handler(request: Request, exc: UnicodeDecodeError):
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": (
+                "Invalid multipart upload format. Please ensure:\n"
+                "1. Product data is sent as JSON string in the 'data' field\n"
+                "2. Images are sent as files in the 'images' field\n"
+                "3. Content-Type is set to 'multipart/form-data'\n"
+                "4. No binary data is mixed with text fields"
+            )
+        },
+    )
+
+
 # ─── Include Routers ─────────────────────────────────────────────────────────
 
 # Mount static files

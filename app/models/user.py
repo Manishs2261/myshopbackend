@@ -181,6 +181,7 @@ class Product(Base):
     brand = Column(String(200))
     price = Column(Numeric(10, 2), nullable=False)
     original_price = Column(Numeric(10, 2))
+    discount_percentage = Column(Integer)
     stock = Column(Integer, default=0)
     unit = Column(String(50))  # kg, pcs, litre, etc.
     status = Column(String(20), default=ProductStatus.PENDING)

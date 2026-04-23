@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Body, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Body, Form, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -16,6 +16,9 @@ from app.schemas.schemas import (
 from slugify import slugify
 import math
 from decimal import Decimal
+from pathlib import Path
+from uuid import uuid4
+import json
 
 router = APIRouter(prefix="/vendor", tags=["Vendor"])
 get_vendor_user = require_role("VENDOR", "ADMIN")
@@ -240,47 +243,173 @@ async def get_vendor(user: User, db: AsyncSession) -> Vendor:
     return vendor
 
 
+def _normalize_product_payload(product_data: dict) -> dict:
+    if not isinstance(product_data, dict):
+        raise HTTPException(status_code=400, detail="Product data must be a JSON object")
+
+    if not product_data.get("name"):
+        raise HTTPException(status_code=400, detail="Product name is required")
+    if product_data.get("price") in (None, ""):
+        raise HTTPException(status_code=400, detail="Product price is required")
+    if product_data.get("category_id") in (None, ""):
+        raise HTTPException(status_code=400, detail="Product category is required")
+
+    normalized = dict(product_data)
+    if normalized.get("category_id") not in (None, ""):
+        normalized["category_id"] = int(normalized["category_id"])
+    if normalized.get("price") not in (None, ""):
+        normalized["price"] = float(normalized["price"])
+    if normalized.get("original_price") not in (None, ""):
+        normalized["original_price"] = float(normalized["original_price"])
+    if normalized.get("discount_percentage") not in (None, ""):
+        normalized["discount_percentage"] = int(normalized["discount_percentage"])
+    if normalized.get("stock") not in (None, ""):
+        normalized["stock"] = int(normalized["stock"])
+    else:
+        normalized["stock"] = 0
+
+    tags = normalized.get("tags")
+    if isinstance(tags, str):
+        normalized["tags"] = [tag.strip() for tag in tags.split(",") if tag.strip()]
+    elif tags is None:
+        normalized["tags"] = []
+
+    variants = normalized.get("variants")
+    if variants is None:
+        normalized["variants"] = []
+
+    return normalized
+
+
+async def _parse_product_request(request: Request) -> tuple[dict, List[UploadFile], UploadFile | None]:
+    content_type = request.headers.get("content-type", "")
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        data_field = form.get("data")
+        if data_field in (None, ""):
+            raise HTTPException(
+                status_code=400,
+                detail="Missing 'data' form field. Send product details as a JSON string.",
+            )
+
+        if isinstance(data_field, UploadFile):
+            raw_data = (await data_field.read()).decode("utf-8")
+        elif isinstance(data_field, (bytes, bytearray)):
+            raw_data = data_field.decode("utf-8")
+        else:
+            raw_data = str(data_field)
+
+        try:
+            product_data = json.loads(raw_data)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON in 'data' field: {e.msg}") from e
+
+        images = [
+            file for file in form.getlist("images")
+            if isinstance(file, UploadFile) and file.filename
+        ]
+        video = form.get("video")
+        if not isinstance(video, UploadFile):
+            video = None
+        return _normalize_product_payload(product_data), images, video
+
+    if "application/json" in content_type:
+        try:
+            product_data = await request.json()
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON body: {str(e)}") from e
+        return _normalize_product_payload(product_data), [], None
+
+    try:
+        form = await request.form()
+    except Exception:
+        form = None
+
+    if form:
+        raw_data = form.get("data")
+        if raw_data:
+            try:
+                return _normalize_product_payload(json.loads(str(raw_data))), [], None
+            except json.JSONDecodeError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid JSON in 'data' field: {e.msg}") from e
+
+    raise HTTPException(
+        status_code=415,
+        detail="Unsupported content type. Use application/json or multipart/form-data.",
+    )
+
+
+async def _save_product_images(vendor: Vendor, images: List[UploadFile], base_url: str) -> List[str]:
+    image_urls = []
+    uploads_dir = Path("uploads/products")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+
+    for image in images:
+        if not image.content_type or not image.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Only image files are allowed")
+
+        safe_name = Path(image.filename).name
+        filename = f"{vendor.id}_{uuid4().hex}_{safe_name}"
+        file_path = uploads_dir / filename
+        content = await image.read()
+
+        with open(file_path, "wb") as f:
+            f.write(content)
+
+        image_urls.append(f"{base_url}/uploads/products/{filename}")
+
+    return image_urls
+
+
+def _serialize_product(product: Product) -> dict:
+    return {
+        "id": product.id,
+        "vendor_id": product.vendor_id,
+        "category_id": product.category_id,
+        "name": product.name,
+        "slug": product.slug,
+        "description": product.description,
+        "brand": product.brand,
+        "price": float(product.price),
+        "original_price": float(product.original_price) if product.original_price else None,
+        "discount_percentage": product.discount_percentage,
+        "stock": product.stock,
+        "unit": product.unit,
+        "status": product.status,
+        "rating": product.rating,
+        "review_count": product.review_count,
+        "images": product.images or [],
+        "tags": product.tags or [],
+        "specifications": product.specifications or {},
+        "is_featured": product.is_featured,
+        "view_count": product.view_count,
+        "variants": [
+            {
+                "id": v.id,
+                "size": v.size,
+                "color": v.color,
+                "sku": v.sku,
+                "price": float(v.price) if v.price else None,
+                "stock": v.stock,
+                "images": v.images or [],
+            }
+            for v in product.variants
+        ],
+        "created_at": product.created_at.isoformat() if product.created_at else None,
+    }
+
+
 @router.post("/products", response_model=ProductResponse, status_code=201)
 async def create_product(
-    data: str = Form(...),
-    images: List[UploadFile] = File(default=[]),
-    video: UploadFile = File(None),
+    request: Request,
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
     vendor = await get_vendor(current_user, db)
-
-    # Parse JSON data from form
-    import json
-    product_data = json.loads(data)
-    
-    # Handle image uploads - save actual files
-    image_urls = []
-    import os
-    from pathlib import Path
-    
-    # Create uploads directory if it doesn't exist
-    uploads_dir = Path("uploads/products")
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    
-    for i, image in enumerate(images):
-        # Generate unique filename
-        filename = f"{vendor.id}_{i}_{image.filename}"
-        file_path = uploads_dir / filename
-        
-        # Save the file
-        content = await image.read()
-        with open(file_path, "wb") as f:
-            f.write(content)
-        
-        # Create URL for the saved image
-        image_url = f"http://localhost:8000/uploads/products/{filename}"
-        image_urls.append(image_url)
-    
-    # Handle video upload
-    video_url = None
-    if video:
-        video_url = f"http://localhost:8000/uploads/products/{vendor.id}_video_{video.filename}"
+    product_data, images, video = await _parse_product_request(request)
+    base_url = str(request.base_url).rstrip("/")
+    image_urls = await _save_product_images(vendor, images, base_url)
 
     # Generate unique slug
     base_slug = slugify(product_data["name"])
@@ -301,25 +430,26 @@ async def create_product(
     product_dict = {
         "vendor_id": vendor.id,
         "slug": unique_slug,
-        "status": "active",
+        "status": product_data.get("status") or "active",
         "images": image_urls,
-        # Only include fields that exist in Product model
         "name": product_data.get("name"),
         "description": product_data.get("description"),
         "brand": product_data.get("brand"),
-        "category_id": int(product_data.get("category_id", 0)) if product_data.get("category_id") else None,
-        "price": float(product_data.get("price", 0)),
-        "stock": int(product_data.get("stock", 0)),
+        "category_id": product_data.get("category_id"),
+        "price": product_data.get("price"),
+        "original_price": product_data.get("original_price"),
+        "discount_percentage": product_data.get("discount_percentage"),
+        "stock": product_data.get("stock", 0),
+        "unit": product_data.get("unit"),
         "tags": product_data.get("tags", []),
+        "specifications": product_data.get("specifications") or {},
     }
-    
+
     try:
         product = Product(**product_dict)
         db.add(product)
         await db.flush()
 
-        # Add variants efficiently
-        valid_variants = []
         for v in variants:
             variant_data = {
                 "product_id": product.id,
@@ -330,19 +460,17 @@ async def create_product(
                 "stock": int(v.get("stock", 0)),
                 "images": v.get("images", []),
             }
-            # Only add variant if it has meaningful data
             if variant_data["color"] or variant_data["stock"] > 0:
                 variant = ProductVariant(**variant_data)
                 db.add(variant)
-                valid_variants.append(variant)
 
         await db.commit()
-        await db.refresh(product)
-        return product
+        result = await db.execute(
+            select(Product).where(Product.id == product.id).options(selectinload(Product.variants))
+        )
+        return result.scalar_one()
     except Exception as e:
         await db.rollback()
-        print(f"Error creating product: {e}")
-        print(f"Product data: {product_dict}")
         raise HTTPException(status_code=500, detail=f"Failed to create product: {str(e)}")
 
 
@@ -365,51 +493,15 @@ async def list_vendor_products(
     )
     products = result.scalars().all()
     
-    # Use count from the same query result for efficiency
-    total = len(products)
-    
-    # Convert Product objects to dictionaries for serialization
-    items = []
-    for product in products:
-        product_dict = {
-            "id": product.id,
-            "vendor_id": product.vendor_id,
-            "category_id": product.category_id,
-            "name": product.name,
-            "slug": product.slug,
-            "description": product.description,
-            "brand": product.brand,
-            "price": float(product.price),
-            "original_price": float(product.original_price) if product.original_price else None,
-            "stock": product.stock,
-            "unit": product.unit,
-            "status": product.status,
-            "rating": product.rating,
-            "review_count": product.review_count,
-            "images": product.images or [],
-            "tags": product.tags or [],
-            "specifications": product.specifications or {},
-            "is_featured": product.is_featured,
-            "view_count": product.view_count,
-            "variants": [
-                {
-                    "id": v.id,
-                    "size": v.size,
-                    "color": v.color,
-                    "sku": v.sku,
-                    "price": float(v.price) if v.price else None,
-                    "stock": v.stock,
-                    "images": v.images or []
-                }
-                for v in product.variants
-            ],
-            "created_at": product.created_at.isoformat() if product.created_at else None
-        }
-        items.append(product_dict)
+    total_query = select(func.count()).select_from(Product).where(Product.vendor_id == vendor.id)
+    if status:
+        total_query = total_query.where(Product.status == status)
+    total = (await db.execute(total_query)).scalar() or 0
+    items = [_serialize_product(product) for product in products]
 
     return PaginatedResponse(
         items=items, total=total, page=page, limit=limit,
-        pages=math.ceil(total / limit)
+        pages=math.ceil(total / limit) if total else 0
     )
 
 
@@ -433,7 +525,7 @@ async def get_vendor_product(
 @router.put("/products/{product_id}", response_model=ProductResponse)
 async def update_product(
     product_id: int,
-    payload: ProductUpdate,
+    request: Request,
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -446,19 +538,58 @@ async def update_product(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    for field, value in payload.model_dump(exclude_none=True).items():
-        setattr(product, field, value)
+    product_data, images, video = await _parse_product_request(request)
+    base_url = str(request.base_url).rstrip("/")
+    new_images = await _save_product_images(vendor, images, base_url)
 
-    if payload.name:
-        product.slug = slugify(payload.name)
+    updatable_fields = [
+        "category_id", "name", "description", "brand", "price", "original_price",
+        "discount_percentage",
+        "stock", "unit", "tags", "specifications", "status"
+    ]
+    previous_price = product.price
+    previous_description = product.description
 
-    # Reset to pending review on price/description change
-    if payload.price or payload.description:
+    for field in updatable_fields:
+        if field in product_data:
+            setattr(product, field, product_data[field])
+
+    if new_images:
+        product.images = new_images
+    elif "images" in product_data and isinstance(product_data["images"], list):
+        product.images = product_data["images"]
+
+    if product_data.get("name"):
+        product.slug = f"{slugify(product_data['name'])}-{vendor.id}"
+
+    if (
+        ("price" in product_data and product.price != previous_price) or
+        ("description" in product_data and product.description != previous_description)
+    ):
         product.status = "pending"
 
+    if "variants" in product_data:
+        await db.execute(
+            ProductVariant.__table__.delete().where(ProductVariant.product_id == product.id)
+        )
+        for v in product_data.get("variants", []):
+            variant_data = {
+                "product_id": product.id,
+                "size": v.get("size"),
+                "color": v.get("color"),
+                "sku": v.get("sku"),
+                "price": float(v.get("price", 0)) if v.get("price") else None,
+                "stock": int(v.get("stock", 0)),
+                "images": v.get("images", []),
+            }
+            if variant_data["color"] or variant_data["stock"] > 0:
+                db.add(ProductVariant(**variant_data))
+
     await db.commit()
-    await db.refresh(product)
-    return product
+    result = await db.execute(
+        select(Product).where(Product.id == product.id).options(selectinload(Product.variants))
+    )
+    return result.scalar_one()
 
 
 @router.delete("/products/{product_id}", response_model=dict)
