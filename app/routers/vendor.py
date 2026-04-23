@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Body, Form, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, cast, String
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError, DataError, StatementError
 from typing import List
+from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.security import require_role
 from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category
@@ -466,6 +467,21 @@ def _serialize_product(product: Product) -> dict:
     }
 
 
+def _parse_filter_datetime(value: str | None, end_of_day: bool = False) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            parsed = datetime.strptime(value, "%Y-%m-%d")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid date filter: {value}") from e
+    if end_of_day and parsed.hour == 0 and parsed.minute == 0 and parsed.second == 0 and parsed.microsecond == 0:
+        parsed = parsed + timedelta(days=1)
+    return parsed
+
+
 @router.post("/products", response_model=ProductResponse, status_code=201)
 async def create_product(
     request: Request,
@@ -532,17 +548,92 @@ async def create_product(
 
 @router.get("/products", response_model=PaginatedResponse)
 async def list_vendor_products(
+    search: str = None,
     status: str = None,
+    category_id: int = None,
+    stock_filter: str = None,
+    stock_min: int = Query(default=None, ge=0),
+    stock_max: int = Query(default=None, ge=0),
+    min_price: float = Query(default=None, ge=0),
+    max_price: float = Query(default=None, ge=0),
+    discount_only: bool = False,
+    created_from: str = None,
+    created_to: str = None,
+    updated_from: str = None,
+    updated_to: str = None,
+    sort_by: str = "recent",
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
     vendor = await get_vendor(current_user, db)
-    latest_activity = func.coalesce(Product.updated_at, Product.created_at).desc()
-    query = select(Product).where(Product.vendor_id == vendor.id).order_by(latest_activity)
+    latest_activity = func.coalesce(Product.updated_at, Product.created_at)
+    conditions = [Product.vendor_id == vendor.id]
+
+    if search:
+        term = f"%{search.strip()}%"
+        conditions.append(
+            or_(
+                Product.name.ilike(term),
+                Product.description.ilike(term),
+                Product.brand.ilike(term),
+                cast(Product.tags, String).ilike(term),
+            )
+        )
     if status:
-        query = query.where(Product.status == status)
+        conditions.append(Product.status == status)
+    if category_id:
+        conditions.append(Product.category_id == category_id)
+    if min_price is not None:
+        conditions.append(Product.price >= min_price)
+    if max_price is not None:
+        conditions.append(Product.price <= max_price)
+    if discount_only:
+        conditions.append(Product.discount_percentage.is_not(None))
+        conditions.append(Product.discount_percentage > 0)
+    if stock_min is not None:
+        conditions.append(Product.stock >= stock_min)
+    if stock_max is not None:
+        conditions.append(Product.stock <= stock_max)
+
+    if stock_filter == "in_stock":
+        conditions.append(Product.stock > 0)
+    elif stock_filter == "low_stock":
+        conditions.append(Product.stock > 0)
+        conditions.append(Product.stock <= 5)
+    elif stock_filter == "out_of_stock":
+        conditions.append(Product.stock <= 0)
+    elif stock_filter == "overstock":
+        conditions.append(Product.stock >= 100)
+
+    parsed_created_from = _parse_filter_datetime(created_from)
+    parsed_created_to = _parse_filter_datetime(created_to, end_of_day=True)
+    parsed_updated_from = _parse_filter_datetime(updated_from)
+    parsed_updated_to = _parse_filter_datetime(updated_to, end_of_day=True)
+
+    if parsed_created_from:
+        conditions.append(Product.created_at >= parsed_created_from)
+    if parsed_created_to:
+        conditions.append(Product.created_at < parsed_created_to)
+    if parsed_updated_from:
+        conditions.append(Product.updated_at >= parsed_updated_from)
+    if parsed_updated_to:
+        conditions.append(Product.updated_at < parsed_updated_to)
+
+    sort_map = {
+        "recent": latest_activity.desc(),
+        "newest": Product.created_at.desc(),
+        "oldest": Product.created_at.asc(),
+        "price_asc": Product.price.asc(),
+        "price_desc": Product.price.desc(),
+        "stock_asc": Product.stock.asc(),
+        "stock_desc": Product.stock.desc(),
+        "name_asc": Product.name.asc(),
+        "name_desc": Product.name.desc(),
+    }
+    order_clause = sort_map.get(sort_by, latest_activity.desc())
+    query = select(Product).where(*conditions).order_by(order_clause)
 
     offset = (page - 1) * limit
     result = await db.execute(
@@ -550,9 +641,7 @@ async def list_vendor_products(
     )
     products = result.scalars().all()
     
-    total_query = select(func.count()).select_from(Product).where(Product.vendor_id == vendor.id)
-    if status:
-        total_query = total_query.where(Product.status == status)
+    total_query = select(func.count()).select_from(Product).where(*conditions)
     total = (await db.execute(total_query)).scalar() or 0
     items = [_serialize_product(product) for product in products]
 
