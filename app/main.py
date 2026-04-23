@@ -11,7 +11,7 @@ from app.core.database import create_tables
 from app.core.firebase import init_firebase
 
 # Import all routers
-from app.routers import auth, user, vendor, admin, cart, orders, payments, analytics, reviews, coupons
+from app.routers import auth, user, vendor, admin, cart, orders, payments, analytics, reviews, coupons, public
 
 
 @asynccontextmanager
@@ -109,6 +109,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 app.include_router(auth.router)
 app.include_router(user.router)
+app.include_router(public.router)
 app.include_router(cart.router)
 app.include_router(orders.router)
 app.include_router(payments.router)
