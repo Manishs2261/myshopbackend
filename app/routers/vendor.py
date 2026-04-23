@@ -13,7 +13,7 @@ from app.schemas.schemas import (
     ShopCreate, ShopUpdate, ShopResponse,
     ProductCreate, ProductUpdate, ProductResponse,
     OrderResponse, OrderStatusUpdate, PaginatedResponse,
-    PayoutRequest, PayoutResponse, VendorDashboard, VendorDashboardOverview
+    PayoutRequest, PayoutResponse, VendorDashboard, VendorDashboardOverview, VendorAnalyticsOverview
 )
 from slugify import slugify
 import math
@@ -883,6 +883,114 @@ async def vendor_dashboard(
 
     products_result = await db.execute(
         select(func.count(Product.id)).where(Product.vendor_id == vendor.id)
+    )
+
+
+@router.get("/analytics", response_model=VendorAnalyticsOverview)
+async def vendor_analytics(
+    period: str = Query(default="30d"),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+    days_map = {"7d": 7, "30d": 30, "90d": 90, "1y": 365}
+    days = days_map.get(period, 30)
+    now = datetime.utcnow()
+    current_start = now - timedelta(days=days)
+    previous_start = current_start - timedelta(days=days)
+
+    total_views = (
+        await db.execute(select(func.sum(Product.view_count)).where(Product.vendor_id == vendor.id))
+    ).scalar() or 0
+
+    total_orders = (
+        await db.execute(
+            select(func.count(Order.id.distinct()))
+            .join(OrderItem)
+            .where(OrderItem.vendor_id == vendor.id, Order.created_at >= current_start)
+        )
+    ).scalar() or 0
+
+    revenue_estimate = (
+        await db.execute(
+            select(func.sum(OrderItem.price * OrderItem.quantity))
+            .join(Order)
+            .where(
+                OrderItem.vendor_id == vendor.id,
+                Order.payment_status == "paid",
+                Order.created_at >= current_start,
+            )
+        )
+    ).scalar() or Decimal("0")
+
+    current_period_updates = (
+        await db.execute(
+            select(func.count(Product.id))
+            .where(Product.vendor_id == vendor.id, func.coalesce(Product.updated_at, Product.created_at) >= current_start)
+        )
+    ).scalar() or 0
+    previous_period_updates = (
+        await db.execute(
+            select(func.count(Product.id))
+            .where(
+                Product.vendor_id == vendor.id,
+                func.coalesce(Product.updated_at, Product.created_at) >= previous_start,
+                func.coalesce(Product.updated_at, Product.created_at) < current_start,
+            )
+        )
+    ).scalar() or 0
+    growth_rate = 0.0 if previous_period_updates == 0 else round(((current_period_updates - previous_period_updates) / previous_period_updates) * 100, 2)
+
+    top_products_result = await db.execute(
+        select(Product)
+        .where(Product.vendor_id == vendor.id)
+        .order_by(Product.view_count.desc(), func.coalesce(Product.updated_at, Product.created_at).desc())
+        .limit(5)
+    )
+    top_products = top_products_result.scalars().all()
+
+    recent_products_result = await db.execute(
+        select(Product)
+        .where(Product.vendor_id == vendor.id, func.coalesce(Product.updated_at, Product.created_at) >= current_start)
+        .order_by(func.coalesce(Product.updated_at, Product.created_at).asc())
+    )
+    recent_products = recent_products_result.scalars().all()
+
+    views_by_day = [
+        {
+            "date": product.updated_at.strftime("%d %b") if product.updated_at else product.created_at.strftime("%d %b"),
+            "value": int(product.view_count or 0),
+        }
+        for product in recent_products[-12:]
+    ]
+    clicks_by_day = [
+        {
+            "date": point["date"],
+            "value": 1,
+        }
+        for point in views_by_day
+    ]
+
+    return VendorAnalyticsOverview(
+        total_views=int(total_views),
+        total_clicks=int(total_orders),
+        total_searches=0,
+        revenue_estimate=revenue_estimate,
+        growth_rate=growth_rate,
+        views_by_day=views_by_day,
+        clicks_by_day=clicks_by_day,
+        top_products=[
+            {
+                "product_id": product.id,
+                "name": product.name,
+                "image": (product.images or [None])[0],
+                "views": int(product.view_count or 0),
+                "clicks": 0,
+                "searches": 0,
+            }
+            for product in top_products
+        ],
+        top_cities=[],
     )
     total_products = products_result.scalar() or 0
 

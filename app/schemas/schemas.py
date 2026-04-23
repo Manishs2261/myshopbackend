@@ -651,6 +651,38 @@ class VendorDashboardOverview(BaseModel):
     recent_products: List[VendorDashboardRecentProduct] = []
 
 
+class VendorAnalyticsSeriesPoint(BaseModel):
+    date: str
+    value: int
+
+
+class VendorAnalyticsTopProduct(BaseModel):
+    product_id: int
+    name: str
+    image: Optional[str] = None
+    views: int
+    clicks: int = 0
+    searches: int = 0
+
+
+class VendorAnalyticsCity(BaseModel):
+    city: str
+    count: int
+    percentage: float
+
+
+class VendorAnalyticsOverview(BaseModel):
+    total_views: int
+    total_clicks: int
+    total_searches: int
+    revenue_estimate: Decimal
+    growth_rate: float
+    views_by_day: List[VendorAnalyticsSeriesPoint] = []
+    clicks_by_day: List[VendorAnalyticsSeriesPoint] = []
+    top_products: List[VendorAnalyticsTopProduct] = []
+    top_cities: List[VendorAnalyticsCity] = []
+
+
 class AdminAnalytics(BaseModel):
     total_users: int
     total_vendors: int
