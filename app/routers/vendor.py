@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError, DataError, StatementError
 from typing import List
 from app.core.database import get_db
 from app.core.security import require_role
-from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout
+from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category
 from app.schemas.schemas import (
     VendorCreate, VendorUpdate, VendorResponse,
     ShopCreate, ShopUpdate, ShopResponse,
@@ -281,6 +282,49 @@ def _normalize_product_payload(product_data: dict) -> dict:
     return normalized
 
 
+async def _validate_product_payload(db: AsyncSession, product_data: dict) -> None:
+    if product_data["price"] <= 0:
+        raise HTTPException(status_code=400, detail="Product price must be greater than 0")
+    if product_data.get("original_price") is not None and product_data["original_price"] <= 0:
+        raise HTTPException(status_code=400, detail="Original price must be greater than 0")
+    if product_data.get("original_price") is not None and product_data["original_price"] < product_data["price"]:
+        raise HTTPException(status_code=400, detail="Original price must be greater than or equal to selling price")
+    if product_data.get("discount_percentage") is not None and not 0 <= product_data["discount_percentage"] <= 100:
+        raise HTTPException(status_code=400, detail="Discount percentage must be between 0 and 100")
+    if product_data["stock"] < 0:
+        raise HTTPException(status_code=400, detail="Stock cannot be negative")
+
+    category = await db.execute(select(Category.id).where(Category.id == product_data["category_id"]))
+    if category.scalar_one_or_none() is None:
+        raise HTTPException(status_code=400, detail="Selected category does not exist")
+
+    variants = product_data.get("variants", [])
+    if not isinstance(variants, list):
+        raise HTTPException(status_code=400, detail="Variants must be a list")
+    for index, variant in enumerate(variants, start=1):
+        if not isinstance(variant, dict):
+            raise HTTPException(status_code=400, detail=f"Variant #{index} must be an object")
+        if variant.get("stock") not in (None, "") and int(variant.get("stock", 0)) < 0:
+            raise HTTPException(status_code=400, detail=f"Variant #{index} stock cannot be negative")
+        if variant.get("price") not in (None, "") and float(variant.get("price")) <= 0:
+            raise HTTPException(status_code=400, detail=f"Variant #{index} price must be greater than 0")
+
+
+def _product_error_message(exc: Exception, action: str) -> str:
+    if isinstance(exc, IntegrityError):
+        msg = str(exc.orig).lower()
+        if "product_variants_sku_key" in msg or "sku" in msg:
+            return f"Could not {action} product because one variant SKU already exists. Please use a unique SKU."
+        if "products_slug_key" in msg or "slug" in msg:
+            return f"Could not {action} product because another product already uses this name/slug."
+        if "foreign key" in msg or "category_id" in msg:
+            return f"Could not {action} product because the selected category is invalid."
+        return f"Could not {action} product because of a database constraint error."
+    if isinstance(exc, (DataError, StatementError, ValueError, TypeError)):
+        return f"Could not {action} product because one or more fields have an invalid value."
+    return f"Could not {action} product right now. Please check the form values and try again."
+
+
 async def _parse_product_request(request: Request) -> tuple[dict, List[UploadFile], UploadFile | None]:
     content_type = request.headers.get("content-type", "")
 
@@ -362,6 +406,27 @@ async def _save_product_images(vendor: Vendor, images: List[UploadFile], base_ur
     return image_urls
 
 
+async def _generate_unique_product_slug(
+    db: AsyncSession,
+    name: str,
+    vendor_id: int,
+    exclude_product_id: int | None = None,
+) -> str:
+    base_slug = slugify(name) or "product"
+    candidate = f"{base_slug}-{vendor_id}"
+    counter = 1
+
+    while True:
+        query = select(Product.id).where(Product.slug == candidate)
+        if exclude_product_id is not None:
+            query = query.where(Product.id != exclude_product_id)
+        existing = await db.execute(query)
+        if existing.scalar_one_or_none() is None:
+            return candidate
+        counter += 1
+        candidate = f"{base_slug}-{vendor_id}-{counter}"
+
+
 def _serialize_product(product: Product) -> dict:
     return {
         "id": product.id,
@@ -397,6 +462,7 @@ def _serialize_product(product: Product) -> dict:
             for v in product.variants
         ],
         "created_at": product.created_at.isoformat() if product.created_at else None,
+        "updated_at": product.updated_at.isoformat() if product.updated_at else None,
     }
 
 
@@ -408,20 +474,10 @@ async def create_product(
 ):
     vendor = await get_vendor(current_user, db)
     product_data, images, video = await _parse_product_request(request)
+    await _validate_product_payload(db, product_data)
     base_url = str(request.base_url).rstrip("/")
     image_urls = await _save_product_images(vendor, images, base_url)
-
-    # Generate unique slug
-    base_slug = slugify(product_data["name"])
-    unique_slug = f"{base_slug}-{vendor.id}"
-    
-    # Check if slug exists and add timestamp if needed
-    existing_slug = await db.execute(
-        select(Product).where(Product.slug == unique_slug)
-    )
-    if existing_slug.scalar_one_or_none():
-        import time
-        unique_slug = f"{base_slug}-{vendor.id}-{int(time.time())}"
+    unique_slug = await _generate_unique_product_slug(db, product_data["name"], vendor.id)
     
     # Extract variants before creating product
     variants = product_data.get("variants", [])
@@ -471,7 +527,7 @@ async def create_product(
         return result.scalar_one()
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to create product: {str(e)}")
+        raise HTTPException(status_code=400, detail=_product_error_message(e, "create")) from e
 
 
 @router.get("/products", response_model=PaginatedResponse)
@@ -483,7 +539,8 @@ async def list_vendor_products(
     db: AsyncSession = Depends(get_db),
 ):
     vendor = await get_vendor(current_user, db)
-    query = select(Product).where(Product.vendor_id == vendor.id)
+    latest_activity = func.coalesce(Product.updated_at, Product.created_at).desc()
+    query = select(Product).where(Product.vendor_id == vendor.id).order_by(latest_activity)
     if status:
         query = query.where(Product.status == status)
 
@@ -539,8 +596,12 @@ async def update_product(
         raise HTTPException(status_code=404, detail="Product not found")
 
     product_data, images, video = await _parse_product_request(request)
+    await _validate_product_payload(db, product_data)
     base_url = str(request.base_url).rstrip("/")
     new_images = await _save_product_images(vendor, images, base_url)
+    next_slug = product.slug
+    if product_data.get("name"):
+        next_slug = await _generate_unique_product_slug(db, product_data["name"], vendor.id, exclude_product_id=product.id)
 
     updatable_fields = [
         "category_id", "name", "description", "brand", "price", "original_price",
@@ -550,46 +611,49 @@ async def update_product(
     previous_price = product.price
     previous_description = product.description
 
-    for field in updatable_fields:
-        if field in product_data:
-            setattr(product, field, product_data[field])
+    try:
+        for field in updatable_fields:
+            if field in product_data:
+                setattr(product, field, product_data[field])
 
-    if new_images:
-        product.images = new_images
-    elif "images" in product_data and isinstance(product_data["images"], list):
-        product.images = product_data["images"]
+        if new_images:
+            product.images = new_images
+        elif "images" in product_data and isinstance(product_data["images"], list):
+            product.images = product_data["images"]
 
-    if product_data.get("name"):
-        product.slug = f"{slugify(product_data['name'])}-{vendor.id}"
+        product.slug = next_slug
 
-    if (
-        ("price" in product_data and product.price != previous_price) or
-        ("description" in product_data and product.description != previous_description)
-    ):
-        product.status = "pending"
+        if (
+            ("price" in product_data and product.price != previous_price) or
+            ("description" in product_data and product.description != previous_description)
+        ):
+            product.status = "pending"
 
-    if "variants" in product_data:
-        await db.execute(
-            ProductVariant.__table__.delete().where(ProductVariant.product_id == product.id)
+        if "variants" in product_data:
+            await db.execute(
+                ProductVariant.__table__.delete().where(ProductVariant.product_id == product.id)
+            )
+            for v in product_data.get("variants", []):
+                variant_data = {
+                    "product_id": product.id,
+                    "size": v.get("size"),
+                    "color": v.get("color"),
+                    "sku": v.get("sku"),
+                    "price": float(v.get("price", 0)) if v.get("price") else None,
+                    "stock": int(v.get("stock", 0)),
+                    "images": v.get("images", []),
+                }
+                if variant_data["color"] or variant_data["stock"] > 0:
+                    db.add(ProductVariant(**variant_data))
+
+        await db.commit()
+        result = await db.execute(
+            select(Product).where(Product.id == product.id).options(selectinload(Product.variants))
         )
-        for v in product_data.get("variants", []):
-            variant_data = {
-                "product_id": product.id,
-                "size": v.get("size"),
-                "color": v.get("color"),
-                "sku": v.get("sku"),
-                "price": float(v.get("price", 0)) if v.get("price") else None,
-                "stock": int(v.get("stock", 0)),
-                "images": v.get("images", []),
-            }
-            if variant_data["color"] or variant_data["stock"] > 0:
-                db.add(ProductVariant(**variant_data))
-
-    await db.commit()
-    result = await db.execute(
-        select(Product).where(Product.id == product.id).options(selectinload(Product.variants))
-    )
-    return result.scalar_one()
+        return result.scalar_one()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=_product_error_message(e, "update")) from e
 
 
 @router.delete("/products/{product_id}", response_model=dict)

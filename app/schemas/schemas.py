@@ -366,6 +366,7 @@ class ProductResponse(BaseModel):
     view_count: int
     variants: List[ProductVariantResponse] = []
     created_at: Optional[datetime]
+    updated_at: Optional[datetime]
 
     class Config:
         from_attributes = True
@@ -384,6 +385,7 @@ class ProductListResponse(BaseModel):
     rating: float
     images: Optional[List[str]]
     is_featured: bool
+    updated_at: Optional[datetime]
 
     class Config:
         from_attributes = True

@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 import time
 
@@ -72,6 +73,17 @@ async def add_process_time(request: Request, call_next):
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(request: Request, exc: RequestValidationError):
+    messages = []
+    for error in exc.errors():
+        location = " -> ".join(str(part) for part in error.get("loc", []) if part != "body")
+        message = error.get("msg", "Invalid request")
+        messages.append(f"{location}: {message}" if location else message)
+    detail = messages[0] if len(messages) == 1 else messages
+    return JSONResponse(status_code=422, content={"detail": detail})
 
 
 @app.exception_handler(UnicodeDecodeError)
