@@ -7,8 +7,7 @@ from typing import List
 from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.security import require_role
-from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category
-from app.models.all_models import MarketplaceSettings
+from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings
 from app.schemas.schemas import (
     VendorCreate, VendorUpdate, VendorResponse,
     ShopCreate, ShopUpdate, ShopResponse,

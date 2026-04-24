@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vendor Settings - Live Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#4f46e5;--primary-light:#e0e7ff;--bg:#f8fafc;--surface:#ffffff;--text:#0f172a;--text-secondary:#64748b;--border:#e2e8f0;--radius:12px;--shadow:0 1px 3px rgba(0,0,0,0.08);--shadow-lg:0 10px 30px rgba(0,0,0,0.1)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:380px;min-width:380px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sidebar-header{padding:20px 24px 16px;border-bottom:1px solid var(--border)}
+.sidebar-header h1{font-family:'Playfair Display',serif;font-size:20px;margin-bottom:4px}
+.sidebar-header p{font-size:12px;color:var(--text-secondary)}
+
+.sidebar-scroll{flex:1;overflow-y:auto;padding:20px 24px}
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
+.form-group input[type="text"],.form-group input[type="url"],.form-group input[type="number"],.form-group input[type="color"],.form-group textarea,.form-group select{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s,box-shadow 0.2s;background:var(--surface)}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,0.1)}
+.form-group textarea{min-height:80px;resize:vertical}
+.form-group input[type="color"]{height:40px;padding:4px;cursor:pointer}
+
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg);border-radius:8px;margin-bottom:8px}
+.toggle-row span{font-size:13px;font-weight:500}
+.toggle{position:relative;width:40px;height:22px;background:var(--border);border-radius:999px;cursor:pointer;transition:background 0.2s}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;background:white;border-radius:50%;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.15)}
+.toggle.active{background:var(--primary)}
+.toggle.active::after{transform:translateX(18px)}
+
+.color-row{display:flex;gap:10px;align-items:center}
+.color-row input[type="color"]{width:44px;height:44px;padding:2px;border-radius:8px}
+.color-row input[type="text"]{flex:1}
+
+.section-title{font-size:13px;font-weight:700;color:var(--text);margin:24px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.section-title:first-child{margin-top:0}
+
+.sidebar-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px}
+.btn{flex:1;padding:10px 16px;border-radius:8px;border:none;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s}
+.btn-primary{background:var(--primary);color:white}
+.btn-primary:hover{background:#4338ca}
+.btn-secondary{background:var(--bg);color:var(--text);border:1.5px solid var(--border)}
+.btn-secondary:hover{background:var(--border)}
+.status-msg{font-size:12px;padding:8px 12px;border-radius:6px;margin-top:8px;display:none}
+.status-msg.show{display:block}
+.status-msg.success{background:#dcfce7;color:#166534}
+.status-msg.error{background:#fee2e2;color:#991b1b}
+
+.preview-area{flex:1;display:flex;flex-direction:column;background:var(--bg)}
+.preview-header{padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.preview-header h2{font-size:14px;font-weight:600}
+.preview-badge{font-size:11px;background:var(--primary-light);color:var(--primary);padding:4px 10px;border-radius:999px;font-weight:600}
+.preview-frame{flex:1;border:none;width:100%;height:100%;background:white}
+
+.auth-overlay{position:fixed;inset:0;background:rgba(255,255,255,0.95);display:flex;align-items:center;justify-content:center;z-index:1000}
+.auth-box{background:var(--surface);padding:32px;border-radius:var(--radius);box-shadow:var(--shadow-lg);width:360px;text-align:center}
+.auth-box h2{font-family:'Playfair Display',serif;margin-bottom:8px}
+.auth-box p{color:var(--text-secondary);font-size:13px;margin-bottom:20px}
+.auth-box input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:12px;font-family:inherit;font-size:13px}
+.auth-box .btn{width:100%}
+
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:12px}
+.loading-overlay p{color:var(--text-secondary);font-size:14px}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>Store Settings</h1>
+      <p>Customize your storefront appearance</p>
+    </div>
+
+    <div class="sidebar-scroll">
+      <div class="section-title">Colors</div>
+      <div class="form-group">
+        <label>Primary Color</label>
+        <div class="color-row">
+          <input type="color" id="primary_color" value="#c8a96e">
+          <input type="text" id="primary_color_text" value="#c8a96e">
+        </div>
+      <div class="form-group">
+        <label>Secondary Color</label>
+        <div class="color-row">
+          <input type="color" id="secondary_color" value="#1a1208">
+          <input type="text" id="secondary_color_text" value="#1a1208">
+        </div>
+      <div class="form-group">
+        <label>Background Color</label>
+        <div class="color-row">
+          <input type="color" id="background_color" value="#faf8f5">
+          <input type="text" id="background_color_text" value="#faf8f5">
+        </div>
+
+      <div class="section-title">Banner</div>
+      <div class="toggle-row">
+        <span>Show Banner</span>
+        <div class="toggle active" id="show_banner" onclick="toggleSwitch(this)"></div>
+      <div class="form-group">
+        <label>Banner Title</label>
+        <input type="text" id="banner_text" value="Welcome to Our Store">
+      </div>
+      <div class="form-group">
+        <label>Banner Subtitle</label>
+        <input type="text" id="banner_subtext" value="Discover amazing products">
+      </div>
+
+      <div class="section-title">Visibility</div>
+      <div class="toggle-row">
+        <span>Show Vendor Info</span>
+        <div class="toggle active" id="show_vendor_info" onclick="toggleSwitch(this)"></div>
+      <div class="toggle-row">
+        <span>Show Contact Info</span>
+        <div class="toggle active" id="show_contact_info" onclick="toggleSwitch(this)"></div>
+      <div class="toggle-row">
+        <span>Show Ratings</span>
+        <div class="toggle active" id="show_ratings" onclick="toggleSwitch(this)"></div>
+
+      <div class="section-title">Social Links</div>
+      <div class="form-group">
+        <label>Facebook URL</label>
+        <input type="url" id="facebook_url" placeholder="https://facebook.com/...">
+      </div>
+      <div class="form-group">
+        <label>Instagram URL</label>
+        <input type="url" id="instagram_url" placeholder="https://instagram.com/...">
+      </div>
+      <div class="form-group">
+        <label>Twitter URL</label>
+        <input type="url" id="twitter_url" placeholder="https://twitter.com/...">
+      </div>
+      <div class="form-group">
+        <label>WhatsApp Number</label>
+        <input type="text" id="whatsapp_number" placeholder="919876543210">
+      </div>
+
+      <div class="section-title">SEO</div>
+      <div class="form-group">
+        <label>Page Title</label>
+        <input type="text" id="meta_title" placeholder="My Store">
+      </div>
+      <div class="form-group">
+        <label>Meta Description</label>
+        <textarea id="meta_description" placeholder="Short description for search engines..."></textarea>
+      </div>
+
+      <div class="section-title">Advanced</div>
+      <div class="form-group">
+        <label>Products Per Page</label>
+        <input type="number" id="products_per_page" value="12" min="1" max="100">
+      </div>
+      <div class="form-group">
+        <label>Custom CSS</label>
+        <textarea id="custom_css" placeholder="/* Add your custom CSS here */"></textarea>
+      </div>
+
+    <div class="sidebar-footer">
+      <button class="btn btn-secondary" onclick="resetSettings()">Reset</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save Changes</button>
+    </div>
+    <div id="status-msg" class="status-msg"></div>
+
+  <div class="preview-area">
+    <div class="preview-header">
+      <h2>Live Preview</h2>
+      <span class="preview-badge">Auto-updates</span>
+    </div>
+    <iframe class="preview-frame" id="preview-frame" src="about:blank"></iframe>
+  </div>
+
+<!-- Auth overlay -->
+<div class="auth-overlay" id="auth-overlay">
+  <div class="auth-box">
+    <h2>Vendor Login Required</h2>
+    <p>Please enter your access token to manage store settings.</p>
+    <input type="text" id="auth-token" placeholder="Bearer eyJ...">
+    <button class="btn btn-primary" onclick="authenticate()">Continue</button>
+    <p style="margin-top:12px;font-size:11px;color:var(--text-secondary)">Token is saved in session only.</p>
+  </div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loading-overlay" style="display:none">
+  <div class="spinner"></div>
+  <p>Loading your settings...</p>
+</div>
+
+<script>
+const API_BASE = window.location.origin.includes(':3000') ? 'http://localhost:8000' : '';
+let authToken = sessionStorage.getItem('vendor_token') || '';
+let vendorId = null;
+let currentSettings = {};
+
+function $(id){ return document.getElementById(id); }
+
+function toggleSwitch(el){
+  el.classList.toggle('active');
+  previewUpdate();
+}
+
+function getToggle(id){
+  return $(id).classList.contains('active');
+}
+
+function setToggle(id, val){
+  $(id).classList.toggle('active', !!val);
+}
+
+function showStatus(msg, isError){
+  const s = $('status-msg');
+  s.textContent = msg;
+  s.className = 'status-msg show ' + (isError ? 'error' : 'success');
+  setTimeout(() => s.classList.remove('show'), 4000);
+}
+
+function getSettingsFromForm(){
+  return {
+    primary_color: $('primary_color').value,
+    secondary_color: $('secondary_color').value,
+    background_color: $('background_color').value,
+    banner_text: $('banner_text').value,
+    banner_subtext: $('banner_subtext').value,
+    show_banner: getToggle('show_banner'),
+    show_vendor_info: getToggle('show_vendor_info'),
+    show_contact_info: getToggle('show_contact_info'),
+    show_ratings: getToggle('show_ratings'),
+    facebook_url: $('facebook_url').value || null,
+    instagram_url: $('instagram_url').value || null,
+    twitter_url: $('twitter_url').value || null,
+    whatsapp_number: $('whatsapp_number').value || null,
+    meta_title: $('meta_title').value || null,
+    meta_description: $('meta_description').value || null,
+    products_per_page: parseInt($('products_per_page').value) || 12,
+    custom_css: $('custom_css').value || null,
+  };
+}
+
+function applySettingsToForm(s){
+  $('primary_color').value = s.primary_color || '#c8a96e';
+  $('primary_color_text').value = s.primary_color || '#c8a96e';
+  $('secondary_color').value = s.secondary_color || '#1a1208';
+  $('secondary_color_text').value = s.secondary_color || '#1a1208';
+  $('background_color').value = s.background_color || '#faf8f5';
+  $('background_color_text').value = s.background_color || '#faf8f5';
+  $('banner_text').value = s.banner_text || 'Welcome to Our Store';
+  $('banner_subtext').value = s.banner_subtext || 'Discover amazing products';
+  setToggle('show_banner', s.show_banner !== false);
+  setToggle('show_vendor_info', s.show_vendor_info !== false);
+  setToggle('show_contact_info', s.show_contact_info !== false);
+  setToggle('show_ratings', s.show_ratings !== false);
+  $('facebook_url').value = s.facebook_url || '';
+  $('instagram_url').value = s.instagram_url || '';
+  $('twitter_url').value = s.twitter_url || '';
+  $('whatsapp_number').value = s.whatsapp_number || '';
+  $('meta_title').value = s.meta_title || '';
+  $('meta_description').value = s.meta_description || '';
+  $('products_per_page').value = s.products_per_page || 12;
+  $('custom_css').value = s.custom_css || '';
+}
+
+function previewUpdate(){
+  const settings = getSettingsFromForm();
+  const frame = $('preview-frame');
+  if(frame.contentWindow){
+    frame.contentWindow.postMessage({type:'preview-settings',settings:settings}, '*');
+  }
+}
+
+async function api(method, path, body){
+  const opts = {method, headers:{'Authorization': authToken, 'Content-Type':'application/json'}};
+  if(body) opts.body = JSON.stringify(body);
+  const res = await fetch(API_BASE+path, opts);
+  if(!res.ok){
+    const err = await res.json().catch(()=>({detail:'Request failed'}));
+    throw new Error(err.detail || 'Request failed');
+  }
+  return res.json();
+}
+
+async function authenticate(){
+  authToken = $('auth-token').value.trim();
+  if(!authToken) return alert('Please enter a token');
+  if(!authToken.toLowerCase().startsWith('bearer ')) authToken = 'Bearer ' + authToken;
+  sessionStorage.setItem('vendor_token', authToken);
+  $('auth-overlay').style.display = 'none';
+  await loadSettings();
+}
+
+async function loadSettings(){
+  $('loading-overlay').style.display = 'flex';
+  try{
+    const me = await api('GET','/vendor/me');
+    vendorId = me.id;
+    const settings = await api('GET','/vendor/marketplace-settings');
+    currentSettings = settings;
+    applySettingsToForm(settings);
+    $('preview-frame').src = 'vendor-storefront.html?vendor_id='+vendorId;
+    $('loading-overlay').style.display = 'none';
+  }catch(err){
+    $('loading-overlay').style.display = 'none';
+    $('auth-overlay').style.display = 'flex';
+    showStatus(err.message, true);
+  }
+}
+
+async function saveSettings(){
+  try{
+    const settings = getSettingsFromForm();
+    await api('PUT','/vendor/marketplace-settings', settings);
+    currentSettings = settings;
+    showStatus('Settings saved successfully!');
+  }catch(err){
+    showStatus(err.message, true);
+  }
+}
+
+async function resetSettings(){
+  if(!confirm('Reset all settings to default?')) return;
+  try{
+    const res = await api('POST','/vendor/marketplace-settings/reset');
+    currentSettings = res.settings;
+    applySettingsToForm(res.settings);
+    previewUpdate();
+    showStatus('Settings reset to default');
+  }catch(err){
+    showStatus(err.message, true);
+  }
+}
+
+['primary','secondary','background'].forEach(c => {
+  const color = $(c+'_color');
+  const text = $(c+'_color_text');
+  color.addEventListener('input', function(){
+    text.value = this.value;
+    previewUpdate();
+  });
+  text.addEventListener('input', function(){
+    color.value = this.value;
+    previewUpdate();
+  });
+});
+
+document.querySelectorAll('input, textarea, select').forEach(el => {
+  if(!el.id.includes('_color')) el.addEventListener('input', previewUpdate);
+});
+
+if(authToken){
+  $('auth-overlay').style.display = 'none';
+  loadSettings();
+}
+</script>
+</body>
+</html>

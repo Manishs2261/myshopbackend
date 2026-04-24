@@ -70,6 +70,14 @@ class CouponType(str, enum.Enum):
     FIXED = "fixed"
 
 
+class PageTheme(str, enum.Enum):
+    DEFAULT = "default"
+    MODERN = "modern"
+    CLASSIC = "classic"
+    MINIMAL = "minimal"
+    COLORFUL = "colorful"
+
+
 # ─── Models ────────────────────────────────────────────────────────────────
 
 class User(Base):
@@ -122,6 +130,7 @@ class Vendor(Base):
     shop = relationship("Shop", back_populates="vendor", uselist=False)
     products = relationship("Product", back_populates="vendor")
     payouts = relationship("Payout", back_populates="vendor")
+    marketplace_settings = relationship("MarketplaceSettings", back_populates="vendor", uselist=False)
 
 
 class Shop(Base):
@@ -381,3 +390,51 @@ class Payout(Base):
     processed_at = Column(DateTime(timezone=True))
 
     vendor = relationship("Vendor", back_populates="payouts")
+
+
+class MarketplaceSettings(Base):
+    __tablename__ = "marketplace_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), unique=True)
+
+    # Page Theme and Colors
+    theme = Column(String, default=PageTheme.DEFAULT)
+    primary_color = Column(String, default="#c8a96e")  # Gold accent
+    secondary_color = Column(String, default="#1a1208")  # Dark
+    background_color = Column(String, default="#faf8f5")  # Cream
+
+    # Banner Settings
+    banner_text = Column(String, default="Welcome to Our Store")
+    banner_subtext = Column(String, default="Discover amazing products")
+    show_banner = Column(Boolean, default=True)
+
+    # Layout Options
+    show_vendor_info = Column(Boolean, default=True)
+    show_contact_info = Column(Boolean, default=True)
+    show_ratings = Column(Boolean, default=True)
+    products_per_page = Column(Integer, default=12)
+
+    # Custom CSS
+    custom_css = Column(Text, nullable=True)
+
+    # Social Media Links
+    facebook_url = Column(String, nullable=True)
+    instagram_url = Column(String, nullable=True)
+    twitter_url = Column(String, nullable=True)
+    whatsapp_number = Column(String, nullable=True)
+
+    # Store Settings
+    enable_reviews = Column(Boolean, default=True)
+    enable_wishlist = Column(Boolean, default=True)
+    enable_sharing = Column(Boolean, default=True)
+
+    # SEO Settings
+    meta_title = Column(String, nullable=True)
+    meta_description = Column(Text, nullable=True)
+    meta_keywords = Column(String, nullable=True)
+
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    vendor = relationship("Vendor", back_populates="marketplace_settings")

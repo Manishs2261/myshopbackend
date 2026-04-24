@@ -1,7 +1,7 @@
-# TODO: Eye-Catching Showcase Design
+# Showcase Settings & Preview Fix
 
-## Plan Steps:
+## Steps
 
-1. [x] Create `frontend/showcase.html` — stunning, responsive marketplace UI
-2. [x] Update `app/routers/public.py` — add `/showcase-page` route to serve HTML
-3. [ ] Test by visiting `http://localhost:8000/showcase-page`
+1. [ ] Overwrite `frontend/showcase.html` with a clean, working marketplace showcase.
+2. [ ] Create `frontend/vendor-storefront.html` — dynamic vendor storefront that fetches and applies marketplace settings from the API.
+3. [ ] Create `frontend/vendor-settings.html` — vendor settings dashboard with a live preview iframe that updates instantly via `postMessage`.
