@@ -8,6 +8,7 @@ from pathlib import Path
 
 from app.core.database import get_db
 from app.models.user import User, Vendor, Product, Category, Shop, ProductVariant
+from app.models.all_models import MarketplaceSettings
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -158,6 +159,91 @@ async def get_vendor_public_profile(vendor_id: int, db: AsyncSession = Depends(g
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load vendor profile: {str(e)}")
+
+
+@router.get("/vendor/{vendor_id}/marketplace-settings")
+async def get_vendor_marketplace_settings(vendor_id: int, db: AsyncSession = Depends(get_db)):
+    """
+    Get vendor marketplace settings for public preview
+    This endpoint applies custom settings to vendor's storefront
+    """
+    try:
+        # Get vendor by ID
+        result = await db.execute(
+            select(Vendor)
+            .where(Vendor.id == vendor_id)
+            .options(selectinload(Vendor.marketplace_settings))
+        )
+        vendor = result.scalar_one_or_none()
+        
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor not found")
+        
+        # Only show approved vendors publicly
+        if vendor.status != "approved":
+            raise HTTPException(status_code=404, detail="Vendor not approved")
+        
+        # Get marketplace settings or return defaults
+        settings = vendor.marketplace_settings
+        if not settings:
+            # Return default settings if none exist
+            settings_data = {
+                "theme": "default",
+                "primary_color": "#c8a96e",
+                "secondary_color": "#1a1208", 
+                "background_color": "#faf8f5",
+                "banner_text": "Welcome to Our Store",
+                "banner_subtext": "Discover amazing products",
+                "show_banner": True,
+                "show_vendor_info": True,
+                "show_contact_info": True,
+                "show_ratings": True,
+                "products_per_page": 12,
+                "custom_css": None,
+                "facebook_url": None,
+                "instagram_url": None,
+                "twitter_url": None,
+                "whatsapp_number": None,
+                "enable_reviews": True,
+                "enable_wishlist": True,
+                "enable_sharing": True,
+                "meta_title": None,
+                "meta_description": None,
+                "meta_keywords": None,
+            }
+        else:
+            # Return actual settings
+            settings_data = {
+                "theme": settings.theme,
+                "primary_color": settings.primary_color,
+                "secondary_color": settings.secondary_color,
+                "background_color": settings.background_color,
+                "banner_text": settings.banner_text,
+                "banner_subtext": settings.banner_subtext,
+                "show_banner": settings.show_banner,
+                "show_vendor_info": settings.show_vendor_info,
+                "show_contact_info": settings.show_contact_info,
+                "show_ratings": settings.show_ratings,
+                "products_per_page": settings.products_per_page,
+                "custom_css": settings.custom_css,
+                "facebook_url": settings.facebook_url,
+                "instagram_url": settings.instagram_url,
+                "twitter_url": settings.twitter_url,
+                "whatsapp_number": settings.whatsapp_number,
+                "enable_reviews": settings.enable_reviews,
+                "enable_wishlist": settings.enable_wishlist,
+                "enable_sharing": settings.enable_sharing,
+                "meta_title": settings.meta_title,
+                "meta_description": settings.meta_description,
+                "meta_keywords": settings.meta_keywords,
+            }
+        
+        return settings_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load marketplace settings: {str(e)}")
 
 
 @router.get("/showcase")

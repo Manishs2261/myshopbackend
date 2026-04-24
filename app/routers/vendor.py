@@ -8,12 +8,14 @@ from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.security import require_role
 from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category
+from app.models.all_models import MarketplaceSettings
 from app.schemas.schemas import (
     VendorCreate, VendorUpdate, VendorResponse,
     ShopCreate, ShopUpdate, ShopResponse,
     ProductCreate, ProductUpdate, ProductResponse,
     OrderResponse, OrderStatusUpdate, PaginatedResponse,
-    PayoutRequest, PayoutResponse, VendorDashboard, VendorDashboardOverview, VendorAnalyticsOverview
+    PayoutRequest, PayoutResponse, VendorDashboard, VendorDashboardOverview, VendorAnalyticsOverview,
+    MarketplaceSettingsUpdate, MarketplaceSettingsResponse
 )
 from slugify import slugify
 import math
@@ -24,6 +26,10 @@ import json
 
 router = APIRouter(prefix="/vendor", tags=["Vendor"])
 get_vendor_user = require_role("VENDOR", "ADMIN")
+
+
+def serialize_marketplace_settings(settings: MarketplaceSettings) -> dict:
+    return MarketplaceSettingsResponse.model_validate(settings).model_dump()
 
 
 # ─── Vendor Profile ──────────────────────────────────────────────────────────
@@ -884,6 +890,15 @@ async def vendor_dashboard(
     products_result = await db.execute(
         select(func.count(Product.id)).where(Product.vendor_id == vendor.id)
     )
+    total_products = products_result.scalar() or 0
+
+    return VendorDashboardOverview(
+        total_views=total_views,
+        total_orders=total_orders,
+        revenue=revenue,
+        pending_orders=pending_orders,
+        total_products=total_products,
+    )
 
 
 @router.get("/analytics", response_model=VendorAnalyticsOverview)
@@ -1077,4 +1092,117 @@ async def request_payout(
     vendor.total_earnings -= payload.amount
     await db.commit()
     await db.refresh(payout)
-    return payout
+
+    return PayoutResponse.from_orm(payout)
+
+
+# ─── Marketplace Settings ────────────────────────────────────────────────────────
+
+@router.get("/marketplace-settings", response_model=MarketplaceSettingsResponse)
+async def get_marketplace_settings(
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get marketplace settings for the vendor"""
+    vendor = await get_vendor(current_user, db)
+    
+    result = await db.execute(
+        select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
+    )
+    settings = result.scalar_one_or_none()
+    
+    if not settings:
+        # Create default settings
+        settings = MarketplaceSettings(vendor_id=vendor.id)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    
+    return serialize_marketplace_settings(settings)
+
+
+@router.put("/marketplace-settings")
+async def update_marketplace_settings(
+    settings_data: MarketplaceSettingsUpdate,
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update marketplace settings for the vendor"""
+    vendor = await get_vendor(current_user, db)
+    
+    result = await db.execute(
+        select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
+    )
+    settings = result.scalar_one_or_none()
+    
+    if not settings:
+        # Create settings if they don't exist
+        settings = MarketplaceSettings(vendor_id=vendor.id)
+        db.add(settings)
+    
+    # Update settings
+    for field, value in settings_data.model_dump(exclude_unset=True).items():
+        setattr(settings, field, value)
+    
+    settings.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(settings)
+    
+    return {
+        "message": "Marketplace settings updated successfully",
+        "settings": serialize_marketplace_settings(settings)
+    }
+
+
+@router.post("/marketplace-settings/reset")
+async def reset_marketplace_settings(
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset marketplace settings to default values"""
+    vendor = await get_vendor(current_user, db)
+    
+    result = await db.execute(
+        select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
+    )
+    settings = result.scalar_one_or_none()
+    
+    if settings:
+        # Reset to default values
+        settings.theme = "default"
+        settings.primary_color = "#c8a96e"
+        settings.secondary_color = "#1a1208"
+        settings.background_color = "#faf8f5"
+        settings.banner_text = "Welcome to Our Store"
+        settings.banner_subtext = "Discover amazing products"
+        settings.show_banner = True
+        settings.show_vendor_info = True
+        settings.show_contact_info = True
+        settings.show_ratings = True
+        settings.products_per_page = 12
+        settings.custom_css = None
+        settings.facebook_url = None
+        settings.instagram_url = None
+        settings.twitter_url = None
+        settings.whatsapp_number = None
+        settings.enable_reviews = True
+        settings.enable_wishlist = True
+        settings.enable_sharing = True
+        settings.meta_title = None
+        settings.meta_description = None
+        settings.meta_keywords = None
+        settings.updated_at = datetime.utcnow()
+        
+        await db.commit()
+        await db.refresh(settings)
+    else:
+        # Create default settings
+        settings = MarketplaceSettings(vendor_id=vendor.id)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    
+    return {
+        "message": "Marketplace settings reset to default successfully",
+        "settings": serialize_marketplace_settings(settings)
+    }

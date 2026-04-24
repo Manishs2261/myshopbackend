@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 from typing import Optional, List, Any, Dict
 from datetime import datetime
 from decimal import Decimal
@@ -255,6 +255,43 @@ class ShopResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class MarketplaceSettingsBase(BaseModel):
+    theme: Optional[str] = None
+    primary_color: Optional[str] = None
+    secondary_color: Optional[str] = None
+    background_color: Optional[str] = None
+    banner_text: Optional[str] = None
+    banner_subtext: Optional[str] = None
+    show_banner: Optional[bool] = None
+    show_vendor_info: Optional[bool] = None
+    show_contact_info: Optional[bool] = None
+    show_ratings: Optional[bool] = None
+    products_per_page: Optional[int] = Field(default=None, ge=1, le=100)
+    custom_css: Optional[str] = None
+    facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    twitter_url: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    enable_reviews: Optional[bool] = None
+    enable_wishlist: Optional[bool] = None
+    enable_sharing: Optional[bool] = None
+    meta_title: Optional[str] = None
+    meta_description: Optional[str] = None
+    meta_keywords: Optional[str] = None
+
+
+class MarketplaceSettingsUpdate(MarketplaceSettingsBase):
+    pass
+
+
+class MarketplaceSettingsResponse(MarketplaceSettingsBase):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ─── Category ───────────────────────────────────────────────────────────────
