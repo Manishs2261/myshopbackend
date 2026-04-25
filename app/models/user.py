@@ -434,6 +434,12 @@ class MarketplaceSettings(Base):
     meta_description = Column(Text, nullable=True)
     meta_keywords = Column(String, nullable=True)
 
+    # Rich storefront editor payloads
+    storefront_draft = Column(JSON, nullable=True)
+    storefront_published = Column(JSON, nullable=True)
+    storefront_status = Column(String, default="draft")
+    published_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

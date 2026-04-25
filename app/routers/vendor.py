@@ -27,8 +27,148 @@ router = APIRouter(prefix="/vendor", tags=["Vendor"])
 get_vendor_user = require_role("VENDOR", "ADMIN")
 
 
-def serialize_marketplace_settings(settings: MarketplaceSettings) -> dict:
-    return MarketplaceSettingsResponse.model_validate(settings).model_dump()
+def merge_dict(base: dict, override: dict | None) -> dict:
+    data = dict(base)
+    for key, value in (override or {}).items():
+        if isinstance(value, dict) and isinstance(data.get(key), dict):
+            data[key] = merge_dict(data[key], value)
+        else:
+            data[key] = value
+    return data
+
+
+def build_storefront_defaults(vendor: Vendor | None = None, shop: Shop | None = None, products: list[Product] | None = None) -> dict:
+    store_name = (shop.name if shop and shop.name else (vendor.business_name if vendor else "BazaarCraft Store")) or "BazaarCraft Store"
+    store_tagline = (shop.description if shop and shop.description else "Handmade pieces with a story in every stitch") or ""
+    product_ids = [product.id for product in (products or []) if getattr(product, "is_featured", False)]
+    slug_source = store_name if store_name else f"vendor-{vendor.id if vendor else 'store'}"
+    return {
+        "branding": {
+            "storeName": store_name,
+            "tagline": store_tagline[:90],
+            "logoUrl": shop.logo_url if shop else "",
+            "faviconUrl": shop.logo_url if shop else "",
+            "shippingMessage": "Free shipping on orders above ₹999",
+            "contactEmail": (vendor.business_email if vendor else "") or "",
+            "contactHours": "Mon-Sat: 9am - 7pm",
+        },
+        "theme": {
+            "primaryColor": "#1a1208",
+            "accentColor": "#c8a96e",
+            "backgroundColor": "#faf8f5",
+            "fontFamily": "DM Sans",
+        },
+        "banner": {
+            "slidesCount": 3,
+            "slides": [
+                {
+                    "tag": "New Arrivals",
+                    "title": f"Shop {store_name}",
+                    "subtext": "A curated storefront shaped around artisan-made pieces and everyday rituals.",
+                    "ctaLabel": "Shop Collection",
+                    "ctaLink": "#featured-products",
+                    "imageUrl": shop.banner_url if shop else "",
+                },
+                {
+                    "tag": "Made with Care",
+                    "title": "Crafted by independent makers",
+                    "subtext": "Discover small-batch products, warm materials, and thoughtful finishing details.",
+                    "ctaLabel": "Explore Now",
+                    "ctaLink": "#recent-products",
+                    "imageUrl": "",
+                },
+                {
+                    "tag": "Limited Pieces",
+                    "title": "Fresh finds every week",
+                    "subtext": "Seasonal drops, featured favorites, and products chosen directly by the vendor.",
+                    "ctaLabel": "View Products",
+                    "ctaLink": "#recent-products",
+                    "imageUrl": "",
+                },
+            ],
+        },
+        "layout": {
+            "style": "Modern",
+            "showFeaturedProducts": True,
+            "productsPerRow": 4,
+            "displayMode": "Grid",
+            "featuredProductIds": product_ids[:8],
+        },
+        "about": {
+            "text": store_tagline or f"{store_name} celebrates thoughtful design, honest materials, and a slower way to shop.",
+        },
+        "promo": {
+            "headline": "Refer a Friend, Earn ₹200 Credits",
+            "subtext": "Share your unique link. When they shop, both of you win.",
+            "ctaLabel": "Get My Code",
+            "ctaLink": "#",
+        },
+        "social": {
+            "website": "",
+            "instagram": "",
+            "facebook": "",
+            "twitter": "",
+            "whatsapp": "",
+            "email": (vendor.business_email if vendor else "") or "",
+        },
+        "seo": {
+            "metaTitle": store_name,
+            "metaDescription": f"Browse {store_name} on BazaarCraft.",
+            "slug": slugify(slug_source) or f"vendor-{vendor.id if vendor else 'store'}",
+        },
+    }
+
+
+def normalize_storefront_payload(settings: MarketplaceSettings | None, vendor: Vendor | None = None, shop: Shop | None = None, products: list[Product] | None = None, published: bool = False) -> dict:
+    defaults = build_storefront_defaults(vendor, shop, products)
+    payload = {}
+    if settings:
+        payload = settings.storefront_published if published and settings.storefront_published else settings.storefront_draft
+    merged = merge_dict(defaults, payload or {})
+    slides = merged["banner"].get("slides", [])
+    merged["banner"]["slides"] = slides[:3] if slides else defaults["banner"]["slides"][:1]
+    merged["banner"]["slidesCount"] = max(1, min(3, int(merged["banner"].get("slidesCount", len(merged["banner"]["slides"]) or 1))))
+    return merged
+
+
+def sync_legacy_marketplace_fields(settings: MarketplaceSettings, payload: dict) -> None:
+    branding = payload.get("branding", {})
+    theme = payload.get("theme", {})
+    banner = payload.get("banner", {})
+    social = payload.get("social", {})
+    seo = payload.get("seo", {})
+    first_slide = (banner.get("slides") or [{}])[0]
+    settings.primary_color = theme.get("accentColor", "#c8a96e")
+    settings.secondary_color = theme.get("primaryColor", "#1a1208")
+    settings.background_color = theme.get("backgroundColor", "#faf8f5")
+    settings.banner_text = first_slide.get("title", branding.get("storeName", "Welcome to Our Store"))
+    settings.banner_subtext = first_slide.get("subtext", branding.get("tagline", "Discover amazing products"))
+    settings.show_banner = True
+    settings.products_per_page = payload.get("layout", {}).get("productsPerRow", 4) * 2
+    settings.facebook_url = social.get("facebook") or None
+    settings.instagram_url = social.get("instagram") or None
+    settings.twitter_url = social.get("twitter") or None
+    settings.whatsapp_number = social.get("whatsapp") or None
+    settings.meta_title = seo.get("metaTitle") or branding.get("storeName")
+    settings.meta_description = seo.get("metaDescription")
+    settings.storefront_status = "live" if settings.storefront_published else "draft"
+
+
+def serialize_editor_state(settings: MarketplaceSettings, vendor: Vendor, shop: Shop | None = None, products: list[Product] | None = None) -> dict:
+    draft = normalize_storefront_payload(settings, vendor, shop, products, published=False)
+    published = normalize_storefront_payload(settings, vendor, shop, products, published=True) if settings.storefront_published else None
+    has_unpublished_changes = bool(settings.storefront_published) and json.dumps(draft, sort_keys=True) != json.dumps(published, sort_keys=True)
+    return {
+        "id": settings.id,
+        "vendor_id": vendor.id,
+        "draft": draft,
+        "published": published,
+        "status": "live" if settings.storefront_published else "draft",
+        "has_unpublished_changes": has_unpublished_changes or not bool(settings.storefront_published),
+        "published_at": settings.published_at.isoformat() if settings.published_at else None,
+        "slug": draft.get("seo", {}).get("slug"),
+        "updated_at": settings.updated_at.isoformat() if settings.updated_at else None,
+    }
 
 
 # ─── Vendor Profile ──────────────────────────────────────────────────────────
@@ -1097,13 +1237,14 @@ async def request_payout(
 
 # ─── Marketplace Settings ────────────────────────────────────────────────────────
 
-@router.get("/marketplace-settings", response_model=MarketplaceSettingsResponse)
+@router.get("/marketplace-settings")
 async def get_marketplace_settings(
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get marketplace settings for the vendor"""
     vendor = await get_vendor(current_user, db)
+    await db.refresh(vendor, attribute_names=["shop", "products"])
     
     result = await db.execute(
         select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
@@ -1117,17 +1258,24 @@ async def get_marketplace_settings(
         await db.commit()
         await db.refresh(settings)
     
-    return serialize_marketplace_settings(settings)
+    if not settings.storefront_draft:
+        settings.storefront_draft = build_storefront_defaults(vendor, vendor.shop, vendor.products)
+        sync_legacy_marketplace_fields(settings, settings.storefront_draft)
+        await db.commit()
+        await db.refresh(settings)
+
+    return serialize_editor_state(settings, vendor, vendor.shop, vendor.products)
 
 
 @router.put("/marketplace-settings")
 async def update_marketplace_settings(
-    settings_data: MarketplaceSettingsUpdate,
+    payload: dict = Body(...),
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Update marketplace settings for the vendor"""
     vendor = await get_vendor(current_user, db)
+    await db.refresh(vendor, attribute_names=["shop", "products"])
     
     result = await db.execute(
         select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
@@ -1139,17 +1287,48 @@ async def update_marketplace_settings(
         settings = MarketplaceSettings(vendor_id=vendor.id)
         db.add(settings)
     
-    # Update settings
-    for field, value in settings_data.model_dump(exclude_unset=True).items():
-        setattr(settings, field, value)
-    
+    settings.storefront_draft = merge_dict(build_storefront_defaults(vendor, vendor.shop, vendor.products), payload or {})
+    sync_legacy_marketplace_fields(settings, settings.storefront_draft)
     settings.updated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(settings)
     
     return {
-        "message": "Marketplace settings updated successfully",
-        "settings": serialize_marketplace_settings(settings)
+        "message": "Draft saved",
+        "settings": serialize_editor_state(settings, vendor, vendor.shop, vendor.products)
+    }
+
+
+@router.post("/marketplace-settings/publish")
+async def publish_marketplace_settings(
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Publish the current storefront draft"""
+    vendor = await get_vendor(current_user, db)
+    await db.refresh(vendor, attribute_names=["shop", "products"])
+
+    result = await db.execute(
+        select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
+    )
+    settings = result.scalar_one_or_none()
+
+    if not settings:
+        settings = MarketplaceSettings(vendor_id=vendor.id)
+        db.add(settings)
+
+    settings.storefront_draft = settings.storefront_draft or build_storefront_defaults(vendor, vendor.shop, vendor.products)
+    settings.storefront_published = settings.storefront_draft
+    settings.storefront_status = "live"
+    settings.published_at = datetime.utcnow()
+    sync_legacy_marketplace_fields(settings, settings.storefront_draft)
+    settings.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(settings)
+
+    return {
+        "message": "Storefront published successfully",
+        "settings": serialize_editor_state(settings, vendor, vendor.shop, vendor.products)
     }
 
 
@@ -1160,6 +1339,7 @@ async def reset_marketplace_settings(
 ):
     """Reset marketplace settings to default values"""
     vendor = await get_vendor(current_user, db)
+    await db.refresh(vendor, attribute_names=["shop", "products"])
     
     result = await db.execute(
         select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
@@ -1167,41 +1347,27 @@ async def reset_marketplace_settings(
     settings = result.scalar_one_or_none()
     
     if settings:
-        # Reset to default values
         settings.theme = "default"
-        settings.primary_color = "#c8a96e"
-        settings.secondary_color = "#1a1208"
-        settings.background_color = "#faf8f5"
-        settings.banner_text = "Welcome to Our Store"
-        settings.banner_subtext = "Discover amazing products"
-        settings.show_banner = True
-        settings.show_vendor_info = True
-        settings.show_contact_info = True
-        settings.show_ratings = True
-        settings.products_per_page = 12
+        settings.storefront_draft = build_storefront_defaults(vendor, vendor.shop, vendor.products)
+        sync_legacy_marketplace_fields(settings, settings.storefront_draft)
         settings.custom_css = None
-        settings.facebook_url = None
-        settings.instagram_url = None
-        settings.twitter_url = None
-        settings.whatsapp_number = None
         settings.enable_reviews = True
         settings.enable_wishlist = True
         settings.enable_sharing = True
-        settings.meta_title = None
-        settings.meta_description = None
         settings.meta_keywords = None
         settings.updated_at = datetime.utcnow()
         
         await db.commit()
         await db.refresh(settings)
     else:
-        # Create default settings
         settings = MarketplaceSettings(vendor_id=vendor.id)
+        settings.storefront_draft = build_storefront_defaults(vendor, vendor.shop, vendor.products)
+        sync_legacy_marketplace_fields(settings, settings.storefront_draft)
         db.add(settings)
         await db.commit()
         await db.refresh(settings)
     
     return {
         "message": "Marketplace settings reset to default successfully",
-        "settings": serialize_marketplace_settings(settings)
+        "settings": serialize_editor_state(settings, vendor, vendor.shop, vendor.products)
     }

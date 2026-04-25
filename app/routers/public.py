@@ -5,11 +5,116 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List
 from pathlib import Path
+from slugify import slugify
 
 from app.core.database import get_db
 from app.models.user import User, Vendor, Product, Category, Shop, ProductVariant, MarketplaceSettings
 
 router = APIRouter(prefix="/public", tags=["public"])
+
+
+def frontend_path(filename: str) -> Path:
+    return Path(__file__).resolve().parents[2] / "frontend" / filename
+
+
+def merge_dict(base: dict, override: dict | None) -> dict:
+    data = dict(base)
+    for key, value in (override or {}).items():
+        if isinstance(value, dict) and isinstance(data.get(key), dict):
+            data[key] = merge_dict(data[key], value)
+        else:
+            data[key] = value
+    return data
+
+
+def build_storefront_defaults(vendor: Vendor, shop: Shop | None, products: list[Product]) -> dict:
+    store_name = (shop.name if shop and shop.name else vendor.business_name) or "BazaarCraft Store"
+    store_tagline = (shop.description if shop and shop.description else "Handmade pieces with a story in every stitch") or ""
+    featured_ids = [product.id for product in products if getattr(product, "is_featured", False)]
+    return {
+        "branding": {
+            "storeName": store_name,
+            "tagline": store_tagline[:90],
+            "logoUrl": shop.logo_url if shop else "",
+            "faviconUrl": shop.logo_url if shop else "",
+            "shippingMessage": "Free shipping on orders above ₹999",
+            "contactEmail": vendor.business_email or "",
+            "contactHours": "Mon-Sat: 9am - 7pm",
+        },
+        "theme": {
+            "primaryColor": "#1a1208",
+            "accentColor": "#c8a96e",
+            "backgroundColor": "#faf8f5",
+            "fontFamily": "DM Sans",
+        },
+        "banner": {
+            "slidesCount": 3,
+            "slides": [
+                {
+                    "tag": "New Arrivals",
+                    "title": f"Shop {store_name}",
+                    "subtext": "A curated storefront shaped around artisan-made pieces and everyday rituals.",
+                    "ctaLabel": "Shop Collection",
+                    "ctaLink": "#featured-products",
+                    "imageUrl": shop.banner_url if shop else "",
+                },
+                {
+                    "tag": "Made with Care",
+                    "title": "Crafted by independent makers",
+                    "subtext": "Discover small-batch products, warm materials, and thoughtful finishing details.",
+                    "ctaLabel": "Explore Now",
+                    "ctaLink": "#recent-products",
+                    "imageUrl": "",
+                },
+                {
+                    "tag": "Limited Pieces",
+                    "title": "Fresh finds every week",
+                    "subtext": "Seasonal drops, featured favorites, and products chosen directly by the vendor.",
+                    "ctaLabel": "View Products",
+                    "ctaLink": "#recent-products",
+                    "imageUrl": "",
+                },
+            ],
+        },
+        "layout": {
+            "style": "Modern",
+            "showFeaturedProducts": True,
+            "productsPerRow": 4,
+            "displayMode": "Grid",
+            "featuredProductIds": featured_ids[:8],
+        },
+        "about": {
+            "text": store_tagline or f"{store_name} celebrates thoughtful design, honest materials, and a slower way to shop.",
+        },
+        "promo": {
+            "headline": "Refer a Friend, Earn ₹200 Credits",
+            "subtext": "Share your unique link. When they shop, both of you win.",
+            "ctaLabel": "Get My Code",
+            "ctaLink": "#",
+        },
+        "social": {
+            "website": "",
+            "instagram": "",
+            "facebook": "",
+            "twitter": "",
+            "whatsapp": "",
+            "email": vendor.business_email or "",
+        },
+        "seo": {
+            "metaTitle": store_name,
+            "metaDescription": f"Browse {store_name} on BazaarCraft.",
+            "slug": slugify(store_name) or f"vendor-{vendor.id}",
+        },
+    }
+
+
+def effective_storefront_payload(vendor: Vendor, shop: Shop | None, products: list[Product]) -> dict:
+    settings = vendor.marketplace_settings
+    defaults = build_storefront_defaults(vendor, shop, products)
+    published = settings.storefront_published if settings and settings.storefront_published else None
+    draft = settings.storefront_draft if settings and settings.storefront_draft else None
+    payload = published or draft or {}
+    return merge_dict(defaults, payload)
 
 
 @router.get("/test")
@@ -21,7 +126,7 @@ async def test_endpoint():
 @router.get("/showcase-page", response_class=HTMLResponse)
 async def get_showcase_page():
     """Serve the eye-catching showcase HTML page"""
-    html_path = Path(__file__).resolve().parent.parent / "showcase.html"
+    html_path = frontend_path("showcase.html")
     with open(html_path, "r", encoding="utf-8") as f:
         content = f.read()
     return HTMLResponse(content=content)
@@ -38,7 +143,7 @@ async def get_vendor_public_profile(vendor_id: int, db: AsyncSession = Depends(g
         result = await db.execute(
             select(Vendor)
             .where(Vendor.id == vendor_id)
-            .options(selectinload(Vendor.shop))
+            .options(selectinload(Vendor.shop), selectinload(Vendor.marketplace_settings))
         )
         vendor = result.scalar_one_or_none()
         
@@ -47,7 +152,7 @@ async def get_vendor_public_profile(vendor_id: int, db: AsyncSession = Depends(g
             result = await db.execute(
                 select(Vendor)
                 .where(Vendor.user_id == vendor_id)
-                .options(selectinload(Vendor.shop))
+                .options(selectinload(Vendor.shop), selectinload(Vendor.marketplace_settings))
             )
             vendor = result.scalar_one_or_none()
         
@@ -114,6 +219,15 @@ async def get_vendor_public_profile(vendor_id: int, db: AsyncSession = Depends(g
                 "created_at": product.created_at.isoformat() if product.created_at else None,
             })
         
+        storefront = effective_storefront_payload(vendor, vendor.shop, products)
+        categories = []
+        seen_categories = set()
+        for product in products:
+            category_name = product.category.name if product.category else "Uncategorized"
+            if category_name not in seen_categories:
+                seen_categories.add(category_name)
+                categories.append(category_name)
+
         # Format shop data
         shop = vendor.shop
         shop_data = {
@@ -150,6 +264,8 @@ async def get_vendor_public_profile(vendor_id: int, db: AsyncSession = Depends(g
         return {
             "vendor": vendor_data,
             "shop": shop_data,
+            "storefront": storefront,
+            "categories": categories,
             "products": formatted_products,
             "total_products": len(formatted_products),
         }
@@ -158,6 +274,33 @@ async def get_vendor_public_profile(vendor_id: int, db: AsyncSession = Depends(g
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load vendor profile: {str(e)}")
+
+
+@router.get("/vendor/storefront/{vendor_slug}")
+async def get_vendor_storefront_by_slug(vendor_slug: str, db: AsyncSession = Depends(get_db)):
+    """
+    Resolve a vendor storefront by slug.
+    """
+    vendors_result = await db.execute(
+        select(Vendor)
+        .options(selectinload(Vendor.shop), selectinload(Vendor.marketplace_settings))
+        .order_by(Vendor.created_at.desc())
+    )
+    vendors = vendors_result.scalars().all()
+
+    for vendor in vendors:
+        shop_name = vendor.shop.name if vendor.shop else vendor.business_name
+        payload = effective_storefront_payload(vendor, vendor.shop, [])
+        candidate_slugs = {
+            slugify(shop_name or ""),
+            slugify(vendor.business_name or ""),
+            payload.get("seo", {}).get("slug"),
+            str(vendor.id),
+        }
+        if vendor_slug in {slug for slug in candidate_slugs if slug}:
+            return await get_vendor_public_profile(vendor.id, db)
+
+    raise HTTPException(status_code=404, detail="Vendor not found")
 
 
 @router.get("/vendor/{vendor_id}/marketplace-settings")
@@ -190,62 +333,23 @@ async def get_vendor_marketplace_settings(vendor_id: int, db: AsyncSession = Dep
         # if vendor.status != "approved":
         #     raise HTTPException(status_code=404, detail="Vendor not approved")
         
-        # Get marketplace settings or return defaults
+        products_result = await db.execute(
+            select(Product)
+            .where(
+                Product.vendor_id == vendor.id,
+                Product.status == "approved"
+            )
+            .options(selectinload(Product.category))
+        )
+        products = products_result.scalars().all()
+
         settings = vendor.marketplace_settings
-        if not settings:
-            # Return default settings if none exist
-            settings_data = {
-                "theme": "default",
-                "primary_color": "#c8a96e",
-                "secondary_color": "#1a1208", 
-                "background_color": "#faf8f5",
-                "banner_text": "Welcome to Our Store",
-                "banner_subtext": "Discover amazing products",
-                "show_banner": True,
-                "show_vendor_info": True,
-                "show_contact_info": True,
-                "show_ratings": True,
-                "products_per_page": 12,
-                "custom_css": None,
-                "facebook_url": None,
-                "instagram_url": None,
-                "twitter_url": None,
-                "whatsapp_number": None,
-                "enable_reviews": True,
-                "enable_wishlist": True,
-                "enable_sharing": True,
-                "meta_title": None,
-                "meta_description": None,
-                "meta_keywords": None,
-            }
-        else:
-            # Return actual settings
-            settings_data = {
-                "theme": settings.theme,
-                "primary_color": settings.primary_color,
-                "secondary_color": settings.secondary_color,
-                "background_color": settings.background_color,
-                "banner_text": settings.banner_text,
-                "banner_subtext": settings.banner_subtext,
-                "show_banner": settings.show_banner,
-                "show_vendor_info": settings.show_vendor_info,
-                "show_contact_info": settings.show_contact_info,
-                "show_ratings": settings.show_ratings,
-                "products_per_page": settings.products_per_page,
-                "custom_css": settings.custom_css,
-                "facebook_url": settings.facebook_url,
-                "instagram_url": settings.instagram_url,
-                "twitter_url": settings.twitter_url,
-                "whatsapp_number": settings.whatsapp_number,
-                "enable_reviews": settings.enable_reviews,
-                "enable_wishlist": settings.enable_wishlist,
-                "enable_sharing": settings.enable_sharing,
-                "meta_title": settings.meta_title,
-                "meta_description": settings.meta_description,
-                "meta_keywords": settings.meta_keywords,
-            }
-        
-        return settings_data
+        payload = effective_storefront_payload(vendor, vendor.shop, products)
+        return {
+            "status": "live" if settings and settings.storefront_published else "draft",
+            "published_at": settings.published_at.isoformat() if settings and settings.published_at else None,
+            "payload": payload,
+        }
         
     except HTTPException:
         raise
@@ -264,7 +368,7 @@ async def get_vendors_showcase(db: AsyncSession = Depends(get_db)):
         vendors_result = await db.execute(
             select(Vendor)
             .where(Vendor.status == "approved")
-            .options(selectinload(Vendor.shop))
+            .options(selectinload(Vendor.shop), selectinload(Vendor.marketplace_settings))
             .order_by(Vendor.created_at.desc())
         )
         vendors = vendors_result.scalars().all()
@@ -314,6 +418,14 @@ async def get_vendors_showcase(db: AsyncSession = Depends(get_db)):
                 })
             
             shop = vendor.shop
+            storefront = effective_storefront_payload(vendor, shop, products)
+            categories = []
+            seen_categories = set()
+            for product in products:
+                category_name = product.category.name if product.category else "Uncategorized"
+                if category_name not in seen_categories:
+                    seen_categories.add(category_name)
+                    categories.append(category_name)
             
             vendor_showcase = {
                 "vendor_id": vendor.id,
@@ -333,6 +445,10 @@ async def get_vendors_showcase(db: AsyncSession = Depends(get_db)):
                 "logo_url": shop.logo_url if shop else None,
                 "total_products": len(formatted_products),
                 "products": formatted_products,
+                "categories": categories,
+                "storefront": storefront,
+                "slug": storefront.get("seo", {}).get("slug"),
+                "has_unpublished_changes": bool(vendor.marketplace_settings and (not vendor.marketplace_settings.storefront_published or vendor.marketplace_settings.storefront_draft != vendor.marketplace_settings.storefront_published)),
             }
             
             showcase_data.append(vendor_showcase)

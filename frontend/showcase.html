@@ -3,302 +3,225 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LocalShop — Marketplace</title>
+<title>BazaarCraft Marketplace</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'DM Sans',sans-serif;background:#faf8f5;color:#1a1a1a;font-size:14px}
 :root{--cream:#faf8f5;--warm:#f0ebe2;--accent:#c8a96e;--dark:#1a1208;--mid:#6b5c45;--light:#ede8df}
-
-.topbar{background:var(--dark);color:#e8d5b0;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:0.08em}
-.topbar span{opacity:0.8}
-
-header{background:white;border-bottom:1px solid var(--light);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);font-size:14px}
+a{text-decoration:none;color:inherit}
+.topbar{background:var(--dark);color:#e8d5b0;padding:8px 24px;font-size:11px;letter-spacing:.08em;text-align:center}
+header{background:#fff;border-bottom:1px solid var(--light);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:20px;position:sticky;top:0;z-index:20}
 .logo{display:flex;flex-direction:column}
-.logo-name{font-family:'Playfair Display',serif;font-size:22px;color:var(--dark);letter-spacing:0.02em}
-.logo-sub{font-size:10px;color:var(--accent);letter-spacing:0.18em;text-transform:uppercase;margin-top:1px}
-.header-actions{display:flex;align-items:center;gap:16px}
-.search-bar{display:flex;align-items:center;background:var(--warm);border-radius:24px;padding:8px 16px;gap:8px;width:220px}
-.search-bar input{border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;width:100%;outline:none;color:var(--dark)}
+.logo-name{font-family:'Playfair Display',serif;font-size:22px;color:var(--dark)}
+.logo-sub{font-size:10px;color:var(--accent);letter-spacing:.18em;text-transform:uppercase}
+.search-bar{display:flex;align-items:center;background:var(--warm);border-radius:24px;padding:8px 16px;gap:8px;width:min(360px,100%)}
+.search-bar input{width:100%;border:none;background:transparent;outline:none;font-family:inherit;color:var(--dark);font-size:13px}
 .search-bar input::placeholder{color:var(--mid)}
-.icon-btn{width:36px;height:36px;border-radius:50%;background:var(--warm);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative}
-.badge{position:absolute;top:-2px;right:-2px;background:var(--accent);color:white;border-radius:50%;width:16px;height:16px;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:500}
-
-nav{background:white;border-bottom:1px solid var(--light);padding:0 24px;display:flex;align-items:center;gap:0;overflow-x:auto}
-.nav-item{padding:12px 16px;font-size:13px;color:var(--mid);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all 0.2s;font-weight:400}
-.nav-item:hover,.nav-item.active{color:var(--dark);border-bottom-color:var(--accent);font-weight:500}
-
-.carousel{position:relative;overflow:hidden;height:340px;background:var(--dark)}
-.slides{display:flex;transition:transform 0.55s cubic-bezier(0.25,0.46,0.45,0.94);height:100%}
-.slide{min-width:100%;height:100%;display:flex;align-items:center;padding:0 60px;position:relative;overflow:hidden}
-.slide-1{background:linear-gradient(120deg,#1a1208 55%,#3d2e18 100%)}
-.slide-2{background:linear-gradient(120deg,#0d2238 55%,#1a3d5c 100%)}
-.slide-3{background:linear-gradient(120deg,#1a0d0d 55%,#3d1818 100%)}
-.slide-content{z-index:2;max-width:380px}
-.slide-tag{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);font-weight:500;margin-bottom:12px}
-.slide-title{font-family:'Playfair Display',serif;font-size:36px;color:white;line-height:1.15;margin-bottom:12px}
-.slide-sub{font-size:13px;color:rgba(255,255,255,0.65);line-height:1.6;margin-bottom:24px}
-.slide-btn{background:var(--accent);color:white;border:none;padding:11px 28px;border-radius:4px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;letter-spacing:0.04em}
-.slide-visual{position:absolute;right:80px;top:50%;transform:translateY(-50%);width:220px;height:220px;border-radius:16px;overflow:hidden;opacity:0.9}
-.slide-visual svg{width:100%;height:100%}
-.carousel-dots{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10}
-.dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.35);cursor:pointer;transition:all 0.2s}
-.dot.active{background:var(--accent);width:22px;border-radius:4px}
-.carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:white;width:38px;height:38px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10;font-size:16px;transition:background 0.2s}
-.carousel-arrow:hover{background:rgba(255,255,255,0.22)}
-.arrow-left{left:16px}
-.arrow-right{right:16px}
-
-main{max-width:1200px;margin:0 auto;padding:32px 24px}
+.header-actions{display:flex;gap:12px}
+.icon-btn{width:36px;height:36px;border:none;border-radius:50%;background:var(--warm);display:flex;align-items:center;justify-content:center}
+nav{background:#fff;border-bottom:1px solid var(--light);padding:0 24px;display:flex;overflow:auto}
+.nav-item{padding:12px 16px;font-size:13px;color:var(--mid);border-bottom:2px solid transparent;white-space:nowrap}
+.nav-item.active{color:var(--dark);border-bottom-color:var(--accent);font-weight:500}
+.hero{background:var(--cream);padding:48px 24px 36px;text-align:center}
+.hero-inner{max-width:760px;margin:0 auto}
+.hero h1{font-family:'Playfair Display',serif;font-size:36px;color:var(--dark);margin-bottom:12px}
+.hero p{font-size:14px;color:var(--mid);line-height:1.7;margin-bottom:20px}
+.hero-search{margin:0 auto;width:min(460px,100%)}
+.filter-bar{max-width:1200px;margin:0 auto;padding:0 24px 12px;display:flex;gap:10px;overflow:auto}
+.filter-pill{background:var(--warm);color:var(--mid);border:none;border-radius:20px;padding:7px 18px;font-size:12px;white-space:nowrap;cursor:pointer}
+.filter-pill.active{background:var(--dark);color:#fff}
+main{max-width:1200px;margin:0 auto;padding:24px}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
 .section-title{font-family:'Playfair Display',serif;font-size:24px;color:var(--dark)}
-.see-all{font-size:12px;color:var(--accent);cursor:pointer;letter-spacing:0.06em;font-weight:500}
-
-.vendor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-bottom:40px}
-.vendor-card{background:white;border-radius:16px;overflow:hidden;border:1px solid var(--light);transition:all 0.22s;cursor:pointer}
-.vendor-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,0.08)}
-.vendor-banner{height:200px;background:var(--warm);position:relative}
-.vendor-logo{position:absolute;top:16px;right:16px;width:60px;height:60px;border-radius:12px;background:white;display:flex;align-items:center;justify-content:center;font-size:24px;border:3px solid white;box-shadow:0 4px 8px rgba(0,0,0,0.2)}
-.vendor-info{padding:24px}
-.vendor-name{font-size:18px;font-weight:600;color:var(--dark);margin-bottom:8px}
-.vendor-desc{font-size:13px;color:var(--mid);margin-bottom:16px;line-height:1.5}
-.vendor-stats{display:flex;align-items:center;gap:16px;margin-bottom:16px}
-.vendor-stat{font-size:12px;color:var(--mid)}
-.vendor-stat strong{color:var(--dark)}
-.vendor-contact{font-size:12px;color:var(--mid);margin-bottom:16px}
-.vendor-contact div{margin-bottom:4px}
-.vendor-footer{display:flex;align-items:center;justify-content:space-between}
-.vendor-verified{display:flex;align-items:center;gap:6px;font-size:11px;color:#28a745;font-weight:500}
-.visit-btn{background:var(--accent);color:white;border:none;padding:8px 20px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.2s}
-.visit-btn:hover{background:#b8945c}
-
-.loading{text-align:center;padding:60px 20px;color:var(--mid)}
-.loading-spinner{width:40px;height:40px;border:3px solid var(--light);border-top-color:var(--accent);border-radius:50%;margin:0 auto 20px;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.error{text-align:center;padding:60px 20px;color:#dc3545}
-.error-icon{font-size:48px;margin-bottom:16px}
-
-@media(max-width:1024px){.vendor-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:640px){.vendor-grid{grid-template-columns:1fr}}
+.see-all{font-size:12px;color:var(--accent);letter-spacing:.06em;font-weight:500}
+.vendor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.vendor-card{background:#fff;border-radius:14px;border:1px solid var(--light);overflow:hidden;transition:all .22s;display:flex;flex-direction:column}
+.vendor-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.vendor-banner{height:100px;border-radius:14px 14px 0 0;position:relative;background:linear-gradient(135deg,#362514,#7d6031)}
+.vendor-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,rgba(255,255,255,.05),transparent)}
+.vendor-logo{position:absolute;left:20px;bottom:-28px;width:56px;height:56px;border-radius:50%;border:3px solid #fff;background:var(--warm);display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,.12)}
+.vendor-logo img{width:100%;height:100%;object-fit:cover}
+.vendor-body{padding:36px 18px 18px;display:flex;flex-direction:column;gap:10px;flex:1}
+.vendor-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.vendor-name{font-family:'Playfair Display',serif;font-size:16px;color:var(--dark)}
+.vendor-tagline{font-size:12px;color:var(--mid);line-height:1.6;min-height:38px}
+.vendor-badge{display:inline-flex;align-items:center;gap:6px;background:var(--warm);color:var(--mid);border-radius:12px;font-size:10px;padding:3px 10px;width:max-content}
+.draft-dot{width:7px;height:7px;border-radius:50%;background:#d28c1d}
+.vendor-stats{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--mid);padding-top:2px}
+.stars{color:var(--accent);font-size:12px}
+.visit-btn{margin-top:auto;width:100%;background:var(--dark);color:#fff;border:none;border-radius:8px;font-size:12px;padding:10px;cursor:pointer;transition:background .2s}
+.visit-btn:hover{background:var(--accent)}
+.empty,.loading{padding:60px 20px;text-align:center;color:var(--mid);grid-column:1/-1}
+footer{background:var(--dark);color:rgba(255,255,255,.6);padding:32px 24px;text-align:center;font-size:12px;margin-top:36px}
+.f-logo{font-family:'Playfair Display',serif;color:var(--accent);font-size:20px;margin-bottom:8px}
+@media (max-width:1024px){.vendor-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:720px){header{flex-wrap:wrap}.hero h1{font-size:30px}.vendor-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<div class="topbar">
-  <span>Free shipping on orders above &#8377;999</span>
-  <span>Mon&#8211;Sat: 9am &#8211; 7pm | support@localshop.in</span>
-</div>
+<div class="topbar">Discover Independent Artisan Vendors</div>
 
 <header>
   <div class="logo">
-    <span class="logo-name">LocalShop</span>
-    <span class="logo-sub">Vendor Marketplace</span>
+    <span class="logo-name">BazaarCraft</span>
+    <span class="logo-sub">Artisan Marketplace</span>
   </div>
   <div class="search-bar">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b5c45" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-    <input type="text" placeholder="Search vendors or products..." />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b5c45" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    <input id="header-search" type="text" placeholder="Search vendors or products...">
   </div>
   <div class="header-actions">
-    <button class="icon-btn" title="Wishlist">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1208" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    <button class="icon-btn" aria-label="Wishlist">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1208" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
     </button>
-    <button class="icon-btn" title="Cart">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1208" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
-      <span class="badge" id="cart-count">0</span>
-    </button>
-    <button class="icon-btn" title="Account">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1208" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    <button class="icon-btn" aria-label="Account">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1208" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
     </button>
   </div>
 </header>
 
 <nav>
-  <div class="nav-item active">All Vendors</div>
-  <div class="nav-item">Food &amp; Dining</div>
-  <div class="nav-item">Fashion</div>
-  <div class="nav-item">Electronics</div>
-  <div class="nav-item">Home &amp; Garden</div>
-  <div class="nav-item">Health &amp; Beauty</div>
-  <div class="nav-item">Books &amp; Stationery</div>
+  <a class="nav-item" href="/">All</a>
+  <span class="nav-item">Handicrafts</span>
+  <span class="nav-item">Textiles</span>
+  <span class="nav-item">Pottery</span>
+  <span class="nav-item">Jewellery</span>
+  <span class="nav-item">Organic Foods</span>
+  <span class="nav-item">Skincare</span>
+  <span class="nav-item">Home Decor</span>
+  <span class="nav-item active">Marketplace</span>
 </nav>
 
-<div class="carousel" id="carousel">
-  <button class="carousel-arrow arrow-left" onclick="moveSlide(-1)">&#8249;</button>
-  <div class="slides" id="slides">
-    <div class="slide slide-1">
-      <div class="slide-content">
-        <div class="slide-tag">Welcome to</div>
-        <div class="slide-title">LocalShop Marketplace</div>
-        <div class="slide-sub">Discover amazing products from local vendors in your area. Support local businesses while finding unique items you won't find anywhere else.</div>
-        <button class="slide-btn" onclick="scrollToVendors()">Explore Vendors</button>
-      </div>
-      <div class="slide-visual">
-        <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
-          <rect width="220" height="220" fill="#2d2010"/>
-          <circle cx="110" cy="110" r="60" fill="none" stroke="#c8a96e" stroke-width="2" opacity="0.8"/>
-          <circle cx="110" cy="110" r="40" fill="none" stroke="#c8a96e" stroke-width="1.5" opacity="0.6"/>
-          <circle cx="110" cy="110" r="20" fill="#c8a96e" opacity="0.4"/>
-          <path d="M90 110 L110 90 L130 110 L110 130Z" fill="#c8a96e" opacity="0.9"/>
-          <circle cx="70" cy="110" r="8" fill="#e8c88a" opacity="0.7"/>
-          <circle cx="150" cy="110" r="8" fill="#e8c88a" opacity="0.7"/>
-          <circle cx="110" cy="70" r="8" fill="#e8c88a" opacity="0.7"/>
-          <circle cx="110" cy="150" r="8" fill="#e8c88a" opacity="0.7"/>
-        </svg>
-      </div>
-    <div class="slide slide-2">
-      <div class="slide-content">
-        <div class="slide-tag">Support Local</div>
-        <div class="slide-title">Connect with Your Community</div>
-        <div class="slide-sub">Every purchase supports a local business owner. Build relationships with vendors who care about your community as much as you do.</div>
-        <button class="slide-btn" onclick="scrollToVendors()">Find Vendors</button>
-      </div>
-      <div class="slide-visual">
-        <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
-          <rect width="220" height="220" fill="#0d2238"/>
-          <circle cx="110" cy="110" r="70" fill="#1a3d5c" opacity="0.8"/>
-          <circle cx="110" cy="110" r="50" fill="#185fa5" opacity="0.6"/>
-          <path d="M110 60 L130 90 L120 120 L100 120 L90 90 Z" fill="#378add" opacity="0.8"/>
-          <circle cx="110" cy="110" r="15" fill="none" stroke="#85b7eb" stroke-width="2"/>
-          <circle cx="80" cy="80" r="6" fill="#85b7eb" opacity="0.7"/>
-          <circle cx="140" cy="80" r="6" fill="#85b7eb" opacity="0.7"/>
-          <circle cx="80" cy="140" r="6" fill="#85b7eb" opacity="0.7"/>
-          <circle cx="140" cy="140" r="6" fill="#85b7eb" opacity="0.7"/>
-        </svg>
-      </div>
-    <div class="slide slide-3">
-      <div class="slide-content">
-        <div class="slide-tag">Quality Products</div>
-        <div class="slide-title">Handpicked Local Treasures</div>
-        <div class="slide-sub">From handmade crafts to fresh produce, discover the quality and care that local vendors put into every product they create.</div>
-        <button class="slide-btn" onclick="scrollToVendors()">Shop Now</button>
-      </div>
-      <div class="slide-visual">
-        <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
-          <rect width="220" height="220" fill="#1a0d0d"/>
-          <ellipse cx="110" cy="140" rx="80" ry="40" fill="#3d1818" opacity="0.8"/>
-          <path d="M60 140 Q80 100 110 95 Q140 100 160 140 Q140 150 110 155 Q80 150 60 140Z" fill="#8b4513"/>
-          <circle cx="110" cy="120" r="20" fill="#c8a96e" opacity="0.8"/>
-          <path d="M95 120 Q110 105 125 120 Q110 135 95 120Z" fill="#e8c88a" opacity="0.9"/>
-          <circle cx="90" cy="130" r="5" fill="#c8a96e" opacity="0.7"/>
-          <circle cx="130" cy="130" r="5" fill="#c8a96e" opacity="0.7"/>
-        </svg>
-      </div>
+<section class="hero">
+  <div class="hero-inner">
+    <h1>Explore artisan storefronts across BazaarCraft</h1>
+    <p>Browse independent vendors, discover their stories, and step into storefronts shaped around their craft, products, and personality.</p>
+    <div class="search-bar hero-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b5c45" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      <input id="hero-search" type="text" placeholder="Search storefronts, categories, or cities...">
+    </div>
   </div>
-  <div class="carousel-dots" id="dots">
-    <div class="dot active" onclick="goToSlide(0)"></div>
-    <div class="dot" onclick="goToSlide(1)"></div>
-    <div class="dot" onclick="goToSlide(2)"></div>
-  <button class="carousel-arrow arrow-right" onclick="moveSlide(1)">&#8250;</button>
-</div>
+</section>
 
-<main id="vendors-section">
+<div class="filter-bar" id="filters"></div>
+
+<main>
   <div class="section-header">
-    <h2 class="section-title">Featured Vendors</h2>
-    <span class="see-all" onclick="loadVendors()">View All &rarr;</span>
+    <h2 class="section-title">Vendor Directory</h2>
+    <span class="see-all" id="results-copy">Loading vendors...</span>
   </div>
-
-  <div id="loading-state" class="loading">
-    <div class="loading-spinner"></div>
-    <p>Loading amazing local vendors...</p>
+  <div class="vendor-grid" id="vendor-grid">
+    <div class="loading">Gathering artisan storefronts...</div>
   </div>
-
-  <div id="error-state" class="error" style="display:none;">
-    <div class="error-icon">&#9888;&#65039;</div>
-    <h3>Oops! Something went wrong</h3>
-    <p>We couldn't load the vendors. Please try again later.</p>
-    <button class="slide-btn" onclick="loadVendors()">Try Again</button>
-  </div>
-
-  <div id="vendors-grid" class="vendor-grid" style="display:none;"></div>
 </main>
 
-<footer style="background:var(--dark);color:rgba(255,255,255,0.6);padding:32px 24px;text-align:center;font-size:12px">
-  <div class="f-logo" style="font-family:'Playfair Display',serif;color:var(--accent);font-size:20px;margin-bottom:8px">LocalShop</div>
-  <p>Connecting communities through local commerce</p>
-  <p style="margin-top:8px;font-size:11px;opacity:0.5">&copy; 2026 LocalShop. All rights reserved.</p>
+<footer>
+  <div class="f-logo">BazaarCraft</div>
+  <p>Celebrating India's artisan heritage — one handmade piece at a time</p>
 </footer>
 
 <script>
 const API_BASE = window.location.origin.includes(':3000') ? 'http://localhost:8000' : '';
-let currentSlide = 0;
-const totalSlides = 3;
-let autoPlayTimer;
+const filterLabels = ['All','Handicrafts','Textiles','Pottery','Jewellery','Organic Foods','Skincare','Home Decor'];
+const state = {vendors:[],activeFilter:'All',query:''};
 
-function goToSlide(n) {
-  currentSlide = n;
-  document.getElementById('slides').style.transform = `translateX(-${currentSlide * 100}%)`;
-  document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 }
-function moveSlide(dir){ goToSlide((currentSlide + dir + totalSlides) % totalSlides); }
-function startAutoPlay(){ autoPlayTimer = setInterval(() => moveSlide(1), 4000); }
-function stopAutoPlay(){ clearInterval(autoPlayTimer); }
-document.querySelector('.carousel').addEventListener('mouseenter', stopAutoPlay);
-document.querySelector('.carousel').addEventListener('mouseleave', startAutoPlay);
-startAutoPlay();
 
-document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', function(){
-  document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
-  this.classList.add('active');
-}));
+function createFilters(){
+  const wrap = document.getElementById('filters');
+  wrap.innerHTML = filterLabels.map((label) => `<button class="filter-pill ${label===state.activeFilter?'active':''}" data-filter="${escapeHtml(label)}">${escapeHtml(label)}</button>`).join('');
+  wrap.querySelectorAll('.filter-pill').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.activeFilter = button.dataset.filter;
+      createFilters();
+      renderVendors();
+    });
+  });
+}
 
-function scrollToVendors(){ document.getElementById('vendors-section').scrollIntoView({ behavior:'smooth' }); }
+function vendorMatches(vendor){
+  const storefront = vendor.storefront || {};
+  const branding = storefront.branding || {};
+  const haystack = [
+    vendor.business_name,
+    branding.storeName,
+    branding.tagline,
+    vendor.description,
+    vendor.city,
+    ...(vendor.categories || [])
+  ].join(' ').toLowerCase();
+  const queryMatch = !state.query || haystack.includes(state.query);
+  const filterMatch = state.activeFilter === 'All' || (vendor.categories || []).includes(state.activeFilter);
+  return queryMatch && filterMatch;
+}
 
 function createVendorCard(vendor){
-  const products = vendor.products || [];
-  const featured = products.slice(0, 3);
+  const storefront = vendor.storefront || {};
+  const branding = storefront.branding || {};
+  const theme = storefront.theme || {};
+  const slug = vendor.slug || `vendor-${vendor.vendor_id}`;
+  const category = (vendor.categories && vendor.categories[0]) || 'Artisan';
+  const rating = ((vendor.products || []).reduce((sum, product) => sum + (product.rating || 0), 0) / Math.max((vendor.products || []).filter((product) => product.rating).length, 1)) || 4.8;
   return `
-    <div class="vendor-card" onclick="location.href='vendor-storefront.html?vendor_id=${vendor.vendor_id}'">
-      <div class="vendor-banner" style="background:${vendor.banner_url ? `url(${vendor.banner_url}) center/cover` : 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)'}">
-        <div class="vendor-logo" style="background:${vendor.logo_url ? `url(${vendor.logo_url}) center/cover` : 'linear-gradient(135deg,#c8a96e 0%,#e8c88a 100%)'}">
-          ${vendor.logo_url ? '' : '&#127970;'}
+    <a class="vendor-card" href="/marketplace/${encodeURIComponent(slug)}">
+      <div class="vendor-banner" style="background:${branding.bannerColor || `linear-gradient(135deg, ${theme.primaryColor || '#1a1208'} 0%, ${theme.accentColor || '#c8a96e'} 100%)`} ${branding.bannerImage ? `url('${branding.bannerImage}') center/cover` : ''}">
+        <div class="vendor-logo">${branding.logoUrl ? `<img src="${escapeHtml(branding.logoUrl)}" alt="${escapeHtml(branding.storeName || vendor.business_name)}">` : escapeHtml((branding.storeName || vendor.business_name || 'B').slice(0,1))}</div>
+      </div>
+      <div class="vendor-body">
+        <div class="vendor-head">
+          <div class="vendor-name">${escapeHtml(branding.storeName || vendor.business_name)}</div>
+          ${vendor.has_unpublished_changes ? '<span class="vendor-badge"><span class="draft-dot"></span>Unpublished changes</span>' : ''}
         </div>
-      <div class="vendor-info">
-        <h3 class="vendor-name">${vendor.business_name}</h3>
-        <p class="vendor-desc">${vendor.description || 'Discover amazing products from this local vendor'}</p>
+        <div class="vendor-tagline">${escapeHtml(branding.tagline || vendor.description || 'Craft-led goods with a warm, handmade point of view.')}</div>
+        <span class="vendor-badge">${escapeHtml(category)}</span>
         <div class="vendor-stats">
-          <div class="vendor-stat"><strong>${vendor.total_products}</strong> Products</div>
-          <div class="vendor-stat"><strong>4.5</strong> Rating</div>
-        <div class="vendor-contact">
-          ${vendor.address ? `<div>&#128205; ${vendor.address}</div>` : ''}
-          ${vendor.contact_phone ? `<div>&#128222; ${vendor.contact_phone}</div>` : ''}
-          ${vendor.contact_email ? `<div>&#128231; ${vendor.contact_email}</div>` : ''}
+          <span>${vendor.total_products || 0} products</span>
+          <span><span class="stars">★★★★★</span> ${rating.toFixed(1)}</span>
         </div>
-        <div class="vendor-footer">
-          <div class="vendor-verified">${vendor.verified ? '&#10003; Verified Vendor' : '&#9203; Pending Verification'}</div>
-          <button class="visit-btn">Visit Store &rarr;</button>
-        </div>
-    </div>`;
+        <button class="visit-btn" type="button">Visit Store</button>
+      </div>
+    </a>
+  `;
+}
+
+function renderVendors(){
+  const grid = document.getElementById('vendor-grid');
+  const vendors = state.vendors.filter(vendorMatches);
+  document.getElementById('results-copy').textContent = `${vendors.length} storefront${vendors.length === 1 ? '' : 's'}`;
+  if(!vendors.length){
+    grid.innerHTML = '<div class="empty">No storefronts match this search yet.</div>';
+    return;
+  }
+  grid.innerHTML = vendors.map(createVendorCard).join('');
 }
 
 async function loadVendors(){
   try{
-    document.getElementById('loading-state').style.display='block';
-    document.getElementById('error-state').style.display='none';
-    document.getElementById('vendors-grid').style.display='none';
-
-    const res = await fetch(`${API_BASE}/public/showcase`);
-    if(!res.ok) throw new Error('Failed to fetch');
-    const data = await res.json();
-    if(data.error) throw new Error(data.message);
-
-    const grid = document.getElementById('vendors-grid');
-    grid.innerHTML = '';
-    const vendors = data.vendors || [];
-    if(vendors.length === 0){
-      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--mid)"><div style="font-size:48px;margin-bottom:16px">&#127970;</div><h3 style="margin-bottom:8px;color:var(--dark)">No vendors available</h3><p>Check back later for amazing local vendors!</p></div>`;
-    } else {
-      vendors.forEach(v => grid.innerHTML += createVendorCard(v));
-    }
-    document.getElementById('loading-state').style.display='none';
-    document.getElementById('error-state').style.display='none';
-    grid.style.display='grid';
-  }catch(err){
-    console.error(err);
-    document.getElementById('loading-state').style.display='none';
-    document.getElementById('error-state').style.display='block';
+    const response = await fetch(`${API_BASE}/public/showcase`);
+    const data = await response.json();
+    state.vendors = data.vendors || [];
+    createFilters();
+    renderVendors();
+  }catch(error){
+    document.getElementById('vendor-grid').innerHTML = '<div class="empty">Unable to load vendor storefronts right now.</div>';
+    document.getElementById('results-copy').textContent = 'Unavailable';
   }
 }
 
-document.addEventListener('DOMContentLoaded', loadVendors);
+['header-search','hero-search'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', (event) => {
+    state.query = event.target.value.trim().toLowerCase();
+    document.getElementById('header-search').value = event.target.value;
+    document.getElementById('hero-search').value = event.target.value;
+    renderVendors();
+  });
+});
+
+createFilters();
+loadVendors();
 </script>
 </body>
 </html>

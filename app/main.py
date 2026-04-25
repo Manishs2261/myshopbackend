@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 import time
+from pathlib import Path
 
 from app.core.config import settings
 from app.core.database import create_tables
@@ -120,6 +121,11 @@ app.include_router(vendor.router)
 app.include_router(admin.router)
 
 
+def frontend_file(filename: str) -> str:
+    path = Path(__file__).resolve().parents[1] / "frontend" / filename
+    return path.read_text(encoding="utf-8")
+
+
 # ─── Health Check ────────────────────────────────────────────────────────────
 
 @app.get("/", tags=["Health"])
@@ -130,6 +136,21 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs",
     }
+
+
+@app.get("/marketplace", response_class=HTMLResponse, tags=["Pages"])
+async def marketplace_page():
+    return HTMLResponse(content=frontend_file("showcase.html"))
+
+
+@app.get("/marketplace/{vendor_slug}", response_class=HTMLResponse, tags=["Pages"])
+async def vendor_storefront_page(vendor_slug: str):
+    return HTMLResponse(content=frontend_file("vendor-storefront.html"))
+
+
+@app.get("/settings/marketplace", response_class=HTMLResponse, tags=["Pages"])
+async def marketplace_settings_page():
+    return HTMLResponse(content=frontend_file("vendor-settings.html"))
 
 
 @app.get("/health", tags=["Health"])

@@ -3,286 +3,369 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Storefront</title>
+<title>Vendor Storefront</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<style id="dynamic-theme">
-:root{--primary:#c8a96e;--secondary:#1a1208;--bg:#faf8f5;--surface:#ffffff;--text:#1a1208;--text-secondary:#6b5c45;--border:#ede8df;--accent-light:#f0ebe2}
+<style id="theme-style">
+:root{--cream:#faf8f5;--warm:#f0ebe2;--accent:#c8a96e;--dark:#1a1208;--mid:#6b5c45;--light:#ede8df;--preview-font:'DM Sans',sans-serif}
 </style>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
-.topbar{background:var(--secondary);color:rgba(255,255,255,0.85);padding:8px 24px;display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:0.08em}
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
-.logo{display:flex;align-items:center;gap:12px}
-.logo-img{width:44px;height:44px;border-radius:10px;background:var(--accent-light);display:flex;align-items:center;justify-content:center;font-size:20px;overflow:hidden}
-.logo-img img{width:100%;height:100%;object-fit:cover}
-.logo-text{display:flex;flex-direction:column}
-.logo-name{font-family:'Playfair Display',serif;font-size:20px;color:var(--text)}
-.logo-sub{font-size:10px;color:var(--primary);letter-spacing:0.18em;text-transform:uppercase}
-.header-actions{display:flex;align-items:center;gap:14px}
-.icon-btn{width:36px;height:36px;border-radius:50%;background:var(--accent-light);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
-
-.banner{position:relative;height:280px;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;overflow:hidden}
-.banner-bg{position:absolute;inset:0;z-index:0;background:linear-gradient(135deg,var(--secondary),#3d2e18)}
-.banner-bg img{width:100%;height:100%;object-fit:cover}
-.banner-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.45);z-index:1}
-.banner-content{position:relative;z-index:2;max-width:600px}
-.banner-tag{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--primary);font-weight:500;margin-bottom:10px}
-.banner-title{font-family:'Playfair Display',serif;font-size:32px;color:white;line-height:1.2;margin-bottom:10px}
-.banner-sub{font-size:13px;color:rgba(255,255,255,0.75);line-height:1.5}
-
+body{font-family:var(--preview-font);background:var(--cream);color:var(--dark);font-size:14px}
+body.preview-mode{overflow:hidden}
+body.preview-mode *{pointer-events:none}
+.topbar{background:var(--dark);color:#e8d5b0;padding:8px 24px;display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.08em}
+header{background:#fff;border-bottom:1px solid var(--light);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:0;z-index:20}
+.logo{display:flex;flex-direction:column}
+.logo-name{font-family:'Playfair Display',serif;font-size:22px;color:var(--dark)}
+.logo-sub{font-size:10px;color:var(--accent);letter-spacing:.18em;text-transform:uppercase}
+.search-bar{display:flex;align-items:center;background:var(--warm);border-radius:24px;padding:8px 16px;gap:8px;width:min(240px,100%)}
+.search-bar input{border:none;background:transparent;outline:none;width:100%;font-family:inherit;color:var(--dark);font-size:13px}
+.header-actions{display:flex;gap:12px}
+.icon-btn{width:36px;height:36px;border:none;border-radius:50%;background:var(--warm);display:flex;align-items:center;justify-content:center;position:relative}
+.badge{position:absolute;top:-2px;right:-2px;background:var(--accent);color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;display:flex;align-items:center;justify-content:center}
+nav{background:#fff;border-bottom:1px solid var(--light);padding:0 24px;display:flex;overflow:auto}
+.nav-item{padding:12px 16px;font-size:13px;color:var(--mid);border-bottom:2px solid transparent;white-space:nowrap}
+.nav-item.active{color:var(--dark);border-bottom-color:var(--accent);font-weight:500}
+.carousel{position:relative;overflow:hidden;height:340px;background:var(--dark)}
+.slides{display:flex;height:100%;transition:transform .55s cubic-bezier(.25,.46,.45,.94)}
+.slide{min-width:100%;height:100%;display:flex;align-items:center;padding:0 60px;position:relative;overflow:hidden;background:linear-gradient(120deg,var(--dark) 55%, color-mix(in srgb, var(--accent) 45%, var(--dark)) 100%)}
+.slide::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,rgba(0,0,0,.12),transparent)}
+.slide-image{position:absolute;inset:0;opacity:.28;background:center/cover no-repeat}
+.slide-content{z-index:2;max-width:420px}
+.slide-tag{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:500;margin-bottom:12px}
+.slide-title{font-family:'Playfair Display',serif;font-size:36px;color:#fff;line-height:1.15;margin-bottom:12px}
+.slide-sub{font-size:13px;color:rgba(255,255,255,.72);line-height:1.6;margin-bottom:24px}
+.slide-btn{background:var(--accent);color:#fff;border:none;padding:11px 28px;border-radius:4px;font-family:inherit;font-size:13px;font-weight:500;letter-spacing:.04em}
+.slide-visual{position:absolute;right:80px;top:50%;transform:translateY(-50%);width:220px;height:220px;border-radius:16px;display:grid;place-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16)}
+.slide-visual span{font-family:'Playfair Display',serif;color:rgba(255,255,255,.18);font-size:58px}
+.carousel-dots{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:4}
+.dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.35);cursor:pointer}
+.dot.active{background:var(--accent);width:22px;border-radius:4px}
+.carousel-arrow{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;z-index:4}
+.arrow-left{left:16px}.arrow-right{right:16px}
 main{max-width:1200px;margin:0 auto;padding:32px 24px}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-.section-title{font-family:'Playfair Display',serif;font-size:22px;color:var(--text)}
-
-.vendor-info-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:32px;display:flex;gap:24px;flex-wrap:wrap;align-items:center}
-.info-item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary)}
-.info-item svg{width:16px;height:16px;color:var(--primary)}
-
+.section-title{font-family:'Playfair Display',serif;font-size:24px;color:var(--dark)}
+.see-all{font-size:12px;color:var(--accent);letter-spacing:.06em;font-weight:500}
+.category-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:40px}
+.cat-card{background:#fff;border-radius:12px;padding:20px 12px;text-align:center;border:1px solid var(--light);transition:all .2s}
+.cat-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 20px rgba(200,169,110,.12)}
+.cat-icon{font-size:28px;margin-bottom:10px;display:block}
+.cat-name{font-size:12px;color:var(--mid);font-weight:500}
 .product-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:40px}
-.product-card{background:var(--surface);border-radius:14px;overflow:hidden;border:1px solid var(--border);transition:all 0.22s;cursor:pointer}
-.product-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,0.08)}
-.product-img{height:180px;display:flex;align-items:center;justify-content:center;background:var(--accent-light);position:relative;overflow:hidden}
+.product-grid.list-mode{grid-template-columns:1fr}
+.product-card{background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--light);transition:all .22s;cursor:pointer}
+.product-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.product-grid.list-mode .product-card{display:grid;grid-template-columns:220px 1fr}
+.product-img{height:180px;display:flex;align-items:center;justify-content:center;background:var(--warm);position:relative;overflow:hidden}
 .product-img img{width:100%;height:100%;object-fit:cover}
-.discount-badge{position:absolute;top:10px;right:10px;background:linear-gradient(135deg,#ef4444,#f97316);color:white;font-size:10px;padding:4px 10px;border-radius:8px;font-weight:700}
-.stock-badge{position:absolute;bottom:10px;left:10px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:3px 8px;border-radius:6px}
+.product-badge{position:absolute;top:10px;left:10px;background:var(--accent);color:#fff;font-size:10px;padding:3px 10px;border-radius:12px;font-weight:500;letter-spacing:.04em}
+.product-badge.new{background:#2d6a4f}
 .product-info{padding:14px}
-.product-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;line-height:1.35;min-height:2.4em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.product-category{font-size:11px;color:var(--primary);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px}
-.product-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
-.price-current{font-size:15px;font-weight:800;color:var(--text)}
-.price-old{font-size:12px;color:var(--text-secondary);text-decoration:line-through;margin-left:4px}
-.add-btn{background:var(--secondary);color:white;border:none;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;transition:background 0.2s}
-.add-btn:hover{background:var(--primary)}
-
-.loading{text-align:center;padding:60px 20px;color:var(--text-secondary)}
-.loading-spinner{width:40px;height:40px;border:3px solid var(--accent-light);border-top-color:var(--primary);border-radius:50%;margin:0 auto 20px;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.error{text-align:center;padding:60px 20px;color:#dc3545}
-
-footer{background:var(--secondary);color:rgba(255,255,255,0.6);padding:32px 24px;text-align:center;font-size:12px}
-.socials{display:flex;justify-content:center;gap:12px;margin-top:12px}
-.socials a{color:rgba(255,255,255,0.7);text-decoration:none;font-size:13px;padding:6px 14px;border:1px solid rgba(255,255,255,0.2);border-radius:20px;transition:all 0.2s}
-.socials a:hover{color:white;border-color:var(--primary)}
-
-@media(max-width:1024px){.product-grid{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:768px){.product-grid{grid-template-columns:repeat(2,1fr)}.banner-title{font-size:24px}.banner{height:220px}}
-@media(max-width:480px){.product-grid{grid-template-columns:repeat(2,1fr);gap:10px}.product-info{padding:10px}.banner-title{font-size:20px}}
+.rating{display:flex;align-items:center;gap:3px;margin-bottom:6px}
+.stars{color:var(--accent);font-size:12px}
+.rating-count{font-size:10px;color:var(--mid)}
+.product-name{font-size:13px;font-weight:500;color:var(--dark);margin-bottom:4px;line-height:1.4}
+.product-desc{font-size:11px;color:var(--mid);margin-bottom:10px;line-height:1.5}
+.product-footer{display:flex;align-items:center;justify-content:space-between}
+.price{font-size:16px;font-weight:600;color:var(--dark)}
+.price-old{font-size:11px;color:var(--mid);text-decoration:line-through;margin-left:4px}
+.add-btn{background:var(--dark);color:#fff;border:none;padding:7px 14px;border-radius:8px;font-size:11px;font-weight:500}
+.add-btn:hover{background:var(--accent)}
+.banner-strip{background:var(--dark);padding:28px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:14px;margin-bottom:40px;gap:16px}
+.banner-text h3{font-family:'Playfair Display',serif;font-size:20px;color:#fff;margin-bottom:6px}
+.banner-text p{font-size:12px;color:rgba(255,255,255,.6)}
+.banner-cta{background:var(--accent);color:#fff;border:none;padding:11px 26px;border-radius:6px;font-size:13px;font-weight:500;font-family:inherit}
+.about-card{background:#fff;border-radius:14px;border:1px solid var(--light);padding:22px;margin-bottom:40px;line-height:1.8;color:var(--mid)}
+footer{background:var(--dark);color:rgba(255,255,255,.6);padding:32px 24px;text-align:center;font-size:12px}
+.f-logo{font-family:'Playfair Display',serif;color:var(--accent);font-size:20px;margin-bottom:8px}
+.social-links{display:flex;justify-content:center;gap:12px;margin-top:14px}
+.social-links a{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6)}
+.social-links a:hover{color:var(--accent);border-color:var(--accent)}
+.empty-state{padding:36px 16px;background:#fff;border:1px solid var(--light);border-radius:14px;text-align:center;color:var(--mid)}
+@media (max-width:1024px){.category-grid{grid-template-columns:repeat(3,1fr)}.product-grid{grid-template-columns:repeat(2,1fr)}.slide{padding:0 32px}.slide-visual{display:none}}
+@media (max-width:700px){header{flex-wrap:wrap}.topbar{padding:8px 12px;gap:8px;flex-direction:column}.category-grid,.product-grid{grid-template-columns:1fr}.product-grid.list-mode .product-card{grid-template-columns:1fr}.slide-title{font-size:28px}.banner-strip{flex-direction:column;align-items:flex-start}}
 </style>
 </head>
 <body>
-
 <div class="topbar">
-  <span id="topbar-left">Welcome to our store</span>
-  <span id="topbar-right">Support local businesses</span>
+  <span id="topbar-left">Free shipping on orders above ₹999</span>
+  <span id="topbar-right">Mon-Sat: 9am - 7pm | support@bazaarcraft.in</span>
 </div>
 
 <header>
   <div class="logo">
-    <div class="logo-img" id="store-logo">&#127970;</div>
-    <div class="logo-text">
-      <span class="logo-name" id="store-name">Store</span>
-      <span class="logo-sub" id="store-tagline">Local Vendor</span>
-    </div>
+    <span class="logo-name" id="store-name">BazaarCraft Store</span>
+    <span class="logo-sub" id="store-tagline">Artisan Marketplace</span>
+  </div>
+  <div class="search-bar">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b5c45" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    <input type="text" placeholder="Search this store...">
+  </div>
   <div class="header-actions">
-    <button class="icon-btn" title="Cart" onclick="alert('Cart coming soon')">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
-    </button>
+    <button class="icon-btn" aria-label="Wishlist"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1208" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg></button>
+    <button class="icon-btn" aria-label="Cart"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1208" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg><span class="badge">3</span></button>
+    <button class="icon-btn" aria-label="Profile"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1208" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></button>
   </div>
 </header>
 
-<div class="banner" id="banner-section">
-  <div class="banner-bg" id="banner-bg"></div>
-  <div class="banner-overlay"></div>
-  <div class="banner-content">
-    <div class="banner-tag" id="banner-tag">Welcome</div>
-    <h1 class="banner-title" id="banner-title">Our Store</h1>
-    <p class="banner-sub" id="banner-sub">Discover amazing products</p>
-  </div>
+<nav id="vendor-nav"></nav>
+
+<div class="carousel" id="carousel">
+  <button class="carousel-arrow arrow-left" type="button" onclick="moveSlide(-1)">&#8592;</button>
+  <div class="slides" id="slides"></div>
+  <div class="carousel-dots" id="dots"></div>
+  <button class="carousel-arrow arrow-right" type="button" onclick="moveSlide(1)">&#8594;</button>
+</div>
 
 <main>
-  <div class="vendor-info-bar" id="vendor-info-bar" style="display:none" data-has-info="false">
-    <div class="info-item" id="info-address" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-      <span id="val-address"></span>
+  <div class="section-header">
+    <h2 class="section-title" id="category-title">Shop from this Vendor</h2>
+    <span class="see-all">Browse the collection</span>
+  </div>
+  <div class="category-grid" id="category-grid"></div>
+
+  <section id="featured-section">
+    <div class="section-header">
+      <h2 class="section-title">Featured Products</h2>
+      <span class="see-all">Curated by the vendor</span>
     </div>
-    <div class="info-item" id="info-phone" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-      <span id="val-phone"></span>
+    <div class="product-grid" id="featured-products"></div>
+  </section>
+
+  <div class="banner-strip" id="promo-strip">
+    <div class="banner-text">
+      <h3 id="promo-title">Refer a Friend, Earn ₹200 Credits</h3>
+      <p id="promo-sub">Share your unique link. When they shop, both of you win.</p>
     </div>
-    <div class="info-item" id="info-email" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
-      <span id="val-email"></span>
-    </div>
+    <button class="banner-cta" id="promo-cta">Get My Code</button>
+  </div>
 
   <div class="section-header">
-    <h2 class="section-title">Products</h2>
+    <h2 class="section-title">About the Store</h2>
+    <span class="see-all">Meet the maker</span>
   </div>
+  <div class="about-card" id="about-card"></div>
 
-  <div id="loading-state" class="loading">
-    <div class="loading-spinner"></div>
-    <p>Loading products...</p>
+  <div class="section-header">
+    <h2 class="section-title">Recently Added</h2>
+    <span class="see-all">Newest products</span>
   </div>
-
-  <div id="error-state" class="error" style="display:none;">
-    <div style="font-size:48px;margin-bottom:16px">&#9888;&#65039;</div>
-    <h3>Oops! Something went wrong</h3>
-    <p>We couldn't load the store. Please try again later.</p>
-  </div>
-
-  <div id="products-grid" class="product-grid" style="display:none;"></div>
+  <div class="product-grid" id="recent-products"></div>
 </main>
 
 <footer>
-  <div id="footer-brand" style="font-family:'Playfair Display',serif;color:var(--primary);font-size:20px;margin-bottom:8px">LocalShop</div>
-  <p id="footer-text">Connecting communities through local commerce</p>
-  <div class="socials" id="socials" style="display:none"></div>
+  <div class="f-logo" id="footer-name">BazaarCraft Store</div>
+  <p id="footer-tagline">Celebrating handmade design, one piece at a time.</p>
+  <div class="social-links" id="social-links"></div>
+  <p style="margin-top:10px;font-size:11px;opacity:.5" id="footer-copy">© 2026 BazaarCraft. All rights reserved.</p>
 </footer>
 
 <script>
 const API_BASE = window.location.origin.includes(':3000') ? 'http://localhost:8000' : '';
-const urlParams = new URLSearchParams(window.location.search);
-const vendorId = urlParams.get('vendor_id') || urlParams.get('id');
+const categoryIcons = {'Handicrafts':'🪔','Textiles':'🧵','Pottery':'🏺','Jewellery':'💍','Organic Foods':'🌿','Skincare':'🫧','Home Decor':'🪞','Clothing':'👗','Leather':'👜','Gifting':'🎁','Uncategorized':'✨'};
+const state = {vendor:null,products:[],storefront:null,categories:[],slide:0,timer:null};
 
-if(!vendorId){
-  document.body.innerHTML = '<div style="text-align:center;padding:100px 20px"><h2>Vendor ID Required</h2><p>Please provide ?vendor_id= in the URL.</p></div>';
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 }
 
-async function fetchJson(url){
-  const res = await fetch(url);
-  if(!res.ok) throw new Error('HTTP '+res.status);
-  return res.json();
+function slugFromPath(){
+  const pathname = window.location.pathname.replace(/\/+$/,'');
+  if(pathname.startsWith('/marketplace/')){
+    return decodeURIComponent(pathname.split('/').pop());
+  }
+  const params = new URLSearchParams(window.location.search);
+  return params.get('slug') || params.get('vendor_id') || params.get('id') || '1';
 }
 
-function applySettings(s){
-  const style = document.getElementById('dynamic-theme');
-  const primary = s.primary_color || '#c8a96e';
-  const secondary = s.secondary_color || '#1a1208';
-  const bg = s.background_color || '#faf8f5';
-  style.textContent = ':root{--primary:'+primary+';--secondary:'+secondary+';--bg:'+bg+';--surface:#ffffff;--text:'+secondary+';--text-secondary:#6b5c45;--border:#ede8df;--accent-light:#f0ebe2}';
-  let custom = document.getElementById('custom-css');
-  if(!custom){ custom = document.createElement('style'); custom.id='custom-css'; document.head.appendChild(custom); }
-  custom.textContent = s.custom_css || '';
-  if(s.show_banner !== false){
-    document.getElementById('banner-section').style.display = 'flex';
-    document.getElementById('banner-tag').textContent = s.banner_text || 'Welcome';
-    document.getElementById('banner-title').textContent = s.banner_text || 'Our Store';
-    document.getElementById('banner-sub').textContent = s.banner_subtext || 'Discover amazing products';
-  } else {
-    document.getElementById('banner-section').style.display = 'none';
-  }
-  const socials = [];
-  if(s.facebook_url) socials.push('<a href="'+s.facebook_url+'" target="_blank">Facebook</a>');
-  if(s.instagram_url) socials.push('<a href="'+s.instagram_url+'" target="_blank">Instagram</a>');
-  if(s.twitter_url) socials.push('<a href="'+s.twitter_url+'" target="_blank">Twitter</a>');
-  if(s.whatsapp_number) socials.push('<a href="https://wa.me/'+s.whatsapp_number+'" target="_blank">WhatsApp</a>');
-  if(socials.length){
-    document.getElementById('socials').innerHTML = socials.join('');
-    document.getElementById('socials').style.display = 'flex';
-  } else {
-    document.getElementById('socials').style.display = 'none';
-  }
-  if(s.meta_title) document.title = s.meta_title;
-  const infoBar = document.getElementById('vendor-info-bar');
-  if(s.show_vendor_info === false){
-    infoBar.style.display = 'none';
-  } else if(infoBar.dataset.hasInfo === 'true'){
-    infoBar.style.display = 'flex';
-  }
+function previewOnlyMode(){
+  const params = new URLSearchParams(window.location.search);
+  return params.get('preview') === '1';
 }
 
-window.addEventListener('message', function(event){
-  if(event.data && event.data.type === 'preview-settings'){
-    applySettings(event.data.settings);
+function applyTheme(storefront){
+  const theme = storefront.theme || {};
+  const fontFamily = theme.fontFamily && theme.fontFamily !== 'DM Sans' ? `'${theme.fontFamily}', 'DM Sans', sans-serif` : `'DM Sans', sans-serif`;
+  document.getElementById('theme-style').textContent = `:root{--cream:${theme.backgroundColor || '#faf8f5'};--warm:#f0ebe2;--accent:${theme.accentColor || '#c8a96e'};--dark:${theme.primaryColor || '#1a1208'};--mid:#6b5c45;--light:#ede8df;--preview-font:${fontFamily}}`;
+}
+
+function createProductCard(product){
+  const hasDiscount = product.discount_percentage || (product.original_price && Number(product.original_price) > Number(product.price));
+  const badge = product.discount_percentage ? 'Sale' : (product.is_featured ? 'Bestseller' : (product.created_at ? 'New' : ''));
+  const price = product.discounted_price || product.price || 0;
+  return `
+    <div class="product-card">
+      <div class="product-img">
+        ${badge ? `<div class="product-badge ${badge==='New'?'new':''}">${escapeHtml(badge)}</div>` : ''}
+        ${product.images && product.images[0] ? `<img src="${escapeHtml(product.images[0])}" alt="${escapeHtml(product.name)}">` : '<span style="font-size:36px;color:#c8a96e">✦</span>'}
+      </div>
+      <div class="product-info">
+        <div class="rating"><span class="stars">★★★★★</span><span class="rating-count">(${Math.max(product.review_count || 0, Math.round((product.rating || 4.8) * 18))})</span></div>
+        <div class="product-name">${escapeHtml(product.name)}</div>
+        <div class="product-desc">${escapeHtml(product.description || product.category_name || 'Handmade product')}</div>
+        <div class="product-footer">
+          <div><span class="price">₹${Number(price).toFixed(0)}</span>${hasDiscount && product.price ? `<span class="price-old">₹${Number(product.price).toFixed(0)}</span>` : ''}</div>
+          <button class="add-btn" type="button">+ Add</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderNav(){
+  const categories = state.categories.length ? state.categories : ['All'];
+  const items = ['All', ...categories.filter((category) => category !== 'All')];
+  document.getElementById('vendor-nav').innerHTML = items.map((item, index) => `<span class="nav-item ${index===0?'active':''}">${escapeHtml(item)}</span>`).join('');
+}
+
+function renderCarousel(){
+  const slides = (state.storefront.banner && state.storefront.banner.slides || []).slice(0, Math.max(1, Math.min(3, state.storefront.banner.slidesCount || 1)));
+  const primary = (state.storefront.theme && state.storefront.theme.primaryColor) || '#1a1208';
+  document.getElementById('slides').innerHTML = slides.map((slide) => `
+    <div class="slide" style="background:${state.storefront.theme && state.storefront.theme.primaryColor ? primary : ''}">
+      <div class="slide-image" style="${slide.imageUrl ? `background-image:url('${escapeHtml(slide.imageUrl)}')` : ''}"></div>
+      <div class="slide-content">
+        <div class="slide-tag">${escapeHtml(slide.tag || 'Featured')}</div>
+        <div class="slide-title">${escapeHtml(slide.title || state.storefront.branding.storeName)}</div>
+        <div class="slide-sub">${escapeHtml(slide.subtext || state.storefront.branding.tagline)}</div>
+        <button class="slide-btn" type="button">${escapeHtml(slide.ctaLabel || 'Explore')}</button>
+      </div>
+      <div class="slide-visual"><span>${escapeHtml((state.storefront.branding.storeName || 'B').slice(0,1))}</span></div>
+    </div>
+  `).join('');
+  document.getElementById('dots').innerHTML = slides.map((_, index) => `<div class="dot ${index===0?'active':''}" onclick="goToSlide(${index})"></div>`).join('');
+  state.slide = 0;
+  goToSlide(0);
+}
+
+function renderCategories(){
+  document.getElementById('category-title').textContent = `Shop from ${state.storefront.branding.storeName}`;
+  document.getElementById('category-grid').innerHTML = state.categories.map((category) => `
+    <div class="cat-card">
+      <span class="cat-icon">${categoryIcons[category] || '✨'}</span>
+      <div class="cat-name">${escapeHtml(category)}</div>
+    </div>
+  `).join('');
+}
+
+function renderProducts(){
+  const layout = state.storefront.layout || {};
+  const perRow = Math.max(2, Math.min(4, Number(layout.productsPerRow || 4)));
+  ['featured-products','recent-products'].forEach((id) => {
+    const element = document.getElementById(id);
+    element.className = `product-grid ${layout.displayMode === 'List' ? 'list-mode' : ''}`;
+    element.style.gridTemplateColumns = layout.displayMode === 'List' ? '1fr' : `repeat(${perRow},1fr)`;
+  });
+
+  const featuredIds = new Set(layout.featuredProductIds || []);
+  const featuredProducts = state.products.filter((product) => featuredIds.has(product.id)).slice(0, 8);
+  const fallbackFeatured = featuredProducts.length ? featuredProducts : state.products.filter((product) => product.is_featured).slice(0, 8);
+  const recentProducts = [...state.products].slice(0, 8);
+
+  document.getElementById('featured-section').style.display = layout.showFeaturedProducts === false ? 'none' : 'block';
+  document.getElementById('featured-products').innerHTML = (fallbackFeatured.length ? fallbackFeatured : recentProducts).map(createProductCard).join('') || '<div class="empty-state">No featured products yet.</div>';
+  document.getElementById('recent-products').innerHTML = recentProducts.map(createProductCard).join('') || '<div class="empty-state">No products available yet.</div>';
+}
+
+function renderPromo(){
+  const promo = state.storefront.promo || {};
+  document.getElementById('promo-title').textContent = promo.headline || 'Refer a Friend, Earn ₹200 Credits';
+  document.getElementById('promo-sub').textContent = promo.subtext || 'Share your unique link. When they shop, both of you win.';
+  document.getElementById('promo-cta').textContent = promo.ctaLabel || 'Get My Code';
+}
+
+function renderAbout(){
+  document.getElementById('about-card').textContent = (state.storefront.about && state.storefront.about.text) || 'This vendor celebrates thoughtful design, honest materials, and a slower way to shop.';
+}
+
+function renderFooter(){
+  const branding = state.storefront.branding || {};
+  const social = state.storefront.social || {};
+  document.getElementById('footer-name').textContent = branding.storeName || 'BazaarCraft Store';
+  document.getElementById('footer-tagline').textContent = branding.tagline || 'Celebrating handmade design, one piece at a time.';
+  document.getElementById('footer-copy').textContent = `© 2026 ${branding.storeName || 'BazaarCraft Store'}. All rights reserved.`;
+  const links = [
+    {key:'instagram',icon:'I'},
+    {key:'facebook',icon:'F'},
+    {key:'whatsapp',icon:'W'}
+  ].filter((item) => social[item.key]).map((item) => `<a href="${escapeHtml(social[item.key])}" aria-label="${item.key}">${item.icon}</a>`);
+  document.getElementById('social-links').innerHTML = links.join('');
+}
+
+function renderStorefront(){
+  applyTheme(state.storefront);
+  const branding = state.storefront.branding || {};
+  document.title = (state.storefront.seo && state.storefront.seo.metaTitle) || branding.storeName || 'Vendor Storefront';
+  document.getElementById('topbar-left').textContent = branding.shippingMessage || 'Free shipping on orders above ₹999';
+  document.getElementById('topbar-right').textContent = `${branding.contactHours || 'Mon-Sat: 9am - 7pm'} | ${branding.contactEmail || 'support@bazaarcraft.in'}`;
+  document.getElementById('store-name').textContent = branding.storeName || 'BazaarCraft Store';
+  document.getElementById('store-tagline').textContent = branding.tagline || 'Artisan Marketplace';
+  renderNav();
+  renderCarousel();
+  renderCategories();
+  renderProducts();
+  renderPromo();
+  renderAbout();
+  renderFooter();
+}
+
+function goToSlide(index){
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length || 1;
+  state.slide = (index + total) % total;
+  document.getElementById('slides').style.transform = `translateX(-${state.slide * 100}%)`;
+  document.querySelectorAll('.dot').forEach((dot, dotIndex) => dot.classList.toggle('active', dotIndex === state.slide));
+}
+
+function moveSlide(direction){ goToSlide(state.slide + direction); }
+
+function startAuto(){
+  stopAuto();
+  state.timer = setInterval(() => moveSlide(1), 4000);
+}
+
+function stopAuto(){
+  if(state.timer) clearInterval(state.timer);
+}
+
+window.goToSlide = goToSlide;
+window.moveSlide = moveSlide;
+
+document.getElementById('carousel').addEventListener('mouseenter', stopAuto);
+document.getElementById('carousel').addEventListener('mouseleave', startAuto);
+
+window.addEventListener('message', (event) => {
+  if(event.data && event.data.type === 'preview-storefront' && event.data.payload && event.data.payload.storefront){
+    state.storefront = event.data.payload.storefront;
+    state.products = event.data.payload.products || state.products;
+    state.categories = event.data.payload.categories || state.categories;
+    document.body.classList.toggle('preview-mode', !!event.data.payload.previewMode);
+    renderStorefront();
   }
 });
 
-function applyVendor(data){
-  const v = data.vendor;
-  const shop = data.shop;
-  document.getElementById('store-name').textContent = shop.name || v.business_name;
-  document.getElementById('store-tagline').textContent = shop.description || 'Local Vendor';
-  document.getElementById('footer-brand').textContent = shop.name || v.business_name;
-  if(shop.logo_url){
-    document.getElementById('store-logo').innerHTML = '<img src="'+shop.logo_url+'" alt="">';
+async function loadStorefront(){
+  if(previewOnlyMode()){
+    document.body.classList.add('preview-mode');
+    return;
   }
-  if(shop.banner_url){
-    document.getElementById('banner-bg').innerHTML = '<img src="'+shop.banner_url+'" alt="">';
-  }
-  const infoBar = document.getElementById('vendor-info-bar');
-  let hasInfo = false;
-  if(shop.address){
-    document.getElementById('val-address').textContent = [shop.address, shop.city, shop.state].filter(Boolean).join(', ');
-    document.getElementById('info-address').style.display='flex';
-    hasInfo = true;
-  }
-  if(shop.contact_phone || v.business_phone){
-    document.getElementById('val-phone').textContent = shop.contact_phone || v.business_phone;
-    document.getElementById('info-phone').style.display='flex';
-    hasInfo = true;
-  }
-  if(shop.contact_email || v.business_email){
-    document.getElementById('val-email').textContent = shop.contact_email || v.business_email;
-    document.getElementById('info-email').style.display='flex';
-    hasInfo = true;
-  }
-  if(hasInfo){
-    infoBar.dataset.hasInfo = 'true';
-    infoBar.style.display = 'flex';
-  }
-}
-
-function createProductCard(p){
-  const hasDiscount = p.discount_percentage && p.discount_percentage > 0;
-  const price = hasDiscount ? p.discounted_price : p.price;
-  const priceStr = typeof price === 'number' ? price.toFixed(2) : price;
-  const oldPriceStr = typeof p.price === 'number' ? p.price.toFixed(2) : p.price;
-  return '<div class="product-card" onclick="alert(\'Product details coming soon: '+p.name.replace(/'/g,"\\'")+'\')">'+
-    '<div class="product-img">'+
-      (p.images && p.images[0] ? '<img src="'+p.images[0]+'" alt="'+p.name+'">' : '<span style="font-size:32px">&#128230;</span>')+
-      (hasDiscount ? '<div class="discount-badge">-'+p.discount_percentage+'%</div>' : '')+
-      (p.stock !== undefined && p.stock <= 5 ? '<div class="stock-badge">'+(p.stock === 0 ? 'Out of Stock' : p.stock+' left')+'</div>' : '')+
-    '</div>'+
-    '<div class="product-info">'+
-      '<div class="product-category">'+(p.category_name || 'Product')+'</div>'+
-      '<div class="product-name">'+p.name+'</div>'+
-      '<div class="product-bottom">'+
-        '<div class="price-wrap">'+
-          '<span class="price-current">&#8377;'+priceStr+'</span>'+
-          (hasDiscount ? '<span class="price-old">&#8377;'+oldPriceStr+'</span>' : '')+
-        '</div>'+
-        '<button class="add-btn"'+(p.stock === 0 ? ' disabled style="opacity:0.5"' : '')+'>Add</button>'+
-      '</div>'+
-    '</div>'+
-  '</div>';
-}
-
-async function loadStore(){
+  const slug = slugFromPath();
   try{
-    const [settings, profile] = await Promise.all([
-      fetchJson(API_BASE+'/public/vendor/'+vendorId+'/marketplace-settings'),
-      fetchJson(API_BASE+'/public/vendor/'+vendorId)
-    ]);
-    applySettings(settings);
-    applyVendor(profile);
-    const grid = document.getElementById('products-grid');
-    grid.innerHTML = '';
-    const products = profile.products || [];
-    if(products.length === 0){
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text-secondary)"><div style="font-size:48px;margin-bottom:16px">&#128230;</div><h3 style="margin-bottom:8px;color:var(--text)">No products yet</h3><p>Check back later for new arrivals!</p></div>';
-    } else {
-      products.forEach(p => grid.innerHTML += createProductCard(p));
-    }
-    document.getElementById('loading-state').style.display = 'none';
-    grid.style.display = 'grid';
-  }catch(err){
-    console.error(err);
-    document.getElementById('loading-state').style.display = 'none';
-    document.getElementById('error-state').style.display = 'block';
+    const response = await fetch(`${API_BASE}/public/vendor/storefront/${encodeURIComponent(slug)}`);
+    const data = await response.json();
+    state.vendor = data.vendor;
+    state.products = data.products || [];
+    state.categories = data.categories || [];
+    state.storefront = data.storefront || {};
+    renderStorefront();
+    startAuto();
+  }catch(error){
+    document.body.innerHTML = '<div style="padding:80px 24px;text-align:center;font-family:DM Sans,sans-serif;color:#6b5c45">Unable to load this storefront right now.</div>';
   }
 }
 
-document.addEventListener('DOMContentLoaded', loadStore);
+loadStorefront();
 </script>
 </body>
 </html>
