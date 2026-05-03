@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Body, Form, Request
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, cast, String
 from sqlalchemy.orm import selectinload
@@ -484,7 +485,7 @@ async def _parse_product_request(request: Request) -> tuple[dict, List[UploadFil
                 detail="Missing 'data' form field. Send product details as a JSON string.",
             )
 
-        if isinstance(data_field, UploadFile):
+        if isinstance(data_field, (UploadFile, StarletteUploadFile)):
             raw_data = (await data_field.read()).decode("utf-8")
         elif isinstance(data_field, (bytes, bytearray)):
             raw_data = data_field.decode("utf-8")
@@ -498,10 +499,10 @@ async def _parse_product_request(request: Request) -> tuple[dict, List[UploadFil
 
         images = [
             file for file in form.getlist("images")
-            if isinstance(file, UploadFile) and file.filename
+            if isinstance(file, (UploadFile, StarletteUploadFile)) and file.filename
         ]
         video = form.get("video")
-        if not isinstance(video, UploadFile):
+        if not isinstance(video, (UploadFile, StarletteUploadFile)):
             video = None
         return _normalize_product_payload(product_data), images, video
 
