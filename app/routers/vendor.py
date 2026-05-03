@@ -533,6 +533,7 @@ async def _parse_product_request(request: Request) -> tuple[dict, List[UploadFil
 
 
 async def _save_product_images(vendor: Vendor, images: List[UploadFile], base_url: str) -> List[str]:
+    max_image_size = 5 * 1024 * 1024
     image_urls = []
     uploads_dir = Path("uploads/products")
     if not supabase_storage_enabled():
@@ -544,6 +545,11 @@ async def _save_product_images(vendor: Vendor, images: List[UploadFile], base_ur
 
         content = await image.read()
         safe_name = Path(image.filename or "product-image").name
+        if len(content) > max_image_size:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Image '{safe_name}' is too large. Maximum allowed size is 5MB.",
+            )
 
         if supabase_storage_enabled():
             try:
