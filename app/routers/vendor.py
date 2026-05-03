@@ -268,101 +268,91 @@ async def update_shop(
 
 # Media Upload Endpoints
 
+async def _save_shop_media(file: UploadFile, vendor_id: int, subfolder: str, base_url: str) -> str:
+    max_size = 5 * 1024 * 1024
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    content = await file.read()
+    safe_name = Path(file.filename or "image").name
+    if len(content) > max_size:
+        raise HTTPException(status_code=400, detail="Image too large. Maximum allowed size is 5MB.")
+    if supabase_storage_enabled():
+        try:
+            return await upload_product_image(content, safe_name, vendor_id)
+        except StorageUploadError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+    uploads_dir = Path(f"uploads/{subfolder}")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{vendor_id}_{uuid4().hex}_{safe_name}"
+    with open(uploads_dir / filename, "wb") as f:
+        f.write(content)
+    return f"{base_url}/uploads/{subfolder}/{filename}"
+
+
 @router.post("/shop/logo", response_model=dict)
 async def upload_logo(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
     vendor = await get_vendor(current_user, db)
-    
-    # Get shop
     result = await db.execute(select(Shop).where(Shop.vendor_id == vendor.id))
     shop = result.scalar_one_or_none()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
-    
-    # Validate file type
-    if not file.content_type or not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="Only image files are allowed")
-    
-    # Save file (in production, use cloud storage)
-    # For now, return a mock URL
-    logo_url = f"http://localhost:8000/uploads/logos/{vendor.id}_{file.filename}"
-    
-    # Update shop
+    base_url = str(request.base_url).rstrip("/")
+    logo_url = await _save_shop_media(file, vendor.id, "logos", base_url)
     shop.logo_url = logo_url
     await db.commit()
-    
-    return {"url": logo_url}
+    await db.refresh(shop)
+    return {"url": shop.logo_url}
 
 
 @router.post("/shop/banner", response_model=dict)
 async def upload_banner(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
     vendor = await get_vendor(current_user, db)
-    
-    # Get shop
     result = await db.execute(select(Shop).where(Shop.vendor_id == vendor.id))
     shop = result.scalar_one_or_none()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
-    
-    # Validate file type
-    if not file.content_type or not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="Only image files are allowed")
-    
-    # Save file (in production, use cloud storage)
-    # For now, return a mock URL
-    banner_url = f"http://localhost:8000/uploads/banners/{vendor.id}_{file.filename}"
-    
-    # Update shop
+    base_url = str(request.base_url).rstrip("/")
+    banner_url = await _save_shop_media(file, vendor.id, "banners", base_url)
     shop.banner_url = banner_url
     await db.commit()
-    
-    return {"url": banner_url}
+    await db.refresh(shop)
+    return {"url": shop.banner_url}
 
 
 @router.post("/shop/gallery", response_model=dict)
 async def upload_gallery(
+    request: Request,
     files: List[UploadFile] = File(...),
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
     vendor = await get_vendor(current_user, db)
-    
-    # Get shop
     result = await db.execute(select(Shop).where(Shop.vendor_id == vendor.id))
     shop = result.scalar_one_or_none()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
-    
-    # Validate files
+    base_url = str(request.base_url).rstrip("/")
     urls = []
-    current_gallery = shop.gallery or []
-    
     for file in files:
-        if not file.content_type or not file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="Only image files are allowed")
-        
-        # Save file (in production, use cloud storage)
-        # For now, return a mock URL
-        url = f"http://localhost:8000/uploads/gallery/{vendor.id}_{file.filename}"
-        urls.append(url)
-    
-    # Update shop gallery
-    shop.gallery = current_gallery + urls
+        urls.append(await _save_shop_media(file, vendor.id, "gallery", base_url))
+    shop.gallery = (shop.gallery or []) + urls
     await db.commit()
-    
     return {"urls": urls}
 
 
 @router.delete("/shop/gallery")
 async def remove_gallery_image(
-    url: str = Body(...),
+    url: str = Body(..., embed=True),
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -374,9 +364,9 @@ async def remove_gallery_image(
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
     
-    # Remove URL from gallery
+    # Remove URL from gallery (assign new list so SQLAlchemy detects the change)
     if shop.gallery and url in shop.gallery:
-        shop.gallery.remove(url)
+        shop.gallery = [u for u in shop.gallery if u != url]
         await db.commit()
     
     return {"message": "Image removed from gallery"}

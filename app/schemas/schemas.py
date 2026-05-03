@@ -182,16 +182,16 @@ class UserResponse(BaseModel):
 
 class VendorCreate(BaseModel):
     business_name: str
-    business_email: Optional[str]
-    business_phone: Optional[str]
-    gst_number: Optional[str]
-    pan_number: Optional[str]
-    bank_account: Optional[str]
-    ifsc_code: Optional[str]
+    business_email: Optional[str] = None
+    business_phone: Optional[str] = None
+    gst_number: Optional[str] = None
+    pan_number: Optional[str] = None
+    bank_account: Optional[str] = None
+    ifsc_code: Optional[str] = None
 
 
 class VendorUpdate(VendorCreate):
-    business_name: Optional[str]
+    business_name: Optional[str] = None
 
 
 class VendorResponse(BaseModel):

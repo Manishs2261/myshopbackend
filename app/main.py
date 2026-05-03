@@ -105,6 +105,10 @@ async def unicode_decode_error_handler(request: Request, exc: UnicodeDecodeError
 
 # ─── Include Routers ─────────────────────────────────────────────────────────
 
+# Ensure uploads directory and subdirectories exist before mounting
+for _subdir in ("uploads", "uploads/products", "uploads/logos", "uploads/banners", "uploads/gallery"):
+    Path(_subdir).mkdir(parents=True, exist_ok=True)
+
 # Mount static files
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
