@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError, DataError, StatementError
 from typing import List
 from datetime import datetime, timedelta
 from app.core.database import get_db
+from app.core.storage import upload_product_image, supabase_storage_enabled, StorageUploadError
 from app.core.security import require_role
 from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings
 from app.schemas.schemas import (
@@ -533,20 +534,27 @@ async def _parse_product_request(request: Request) -> tuple[dict, List[UploadFil
 async def _save_product_images(vendor: Vendor, images: List[UploadFile], base_url: str) -> List[str]:
     image_urls = []
     uploads_dir = Path("uploads/products")
-    uploads_dir.mkdir(parents=True, exist_ok=True)
+    if not supabase_storage_enabled():
+        uploads_dir.mkdir(parents=True, exist_ok=True)
 
     for image in images:
         if not image.content_type or not image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="Only image files are allowed")
 
-        safe_name = Path(image.filename).name
+        content = await image.read()
+        safe_name = Path(image.filename or "product-image").name
+
+        if supabase_storage_enabled():
+            try:
+                image_urls.append(await upload_product_image(content, safe_name, vendor.id))
+                continue
+            except StorageUploadError as exc:
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+
         filename = f"{vendor.id}_{uuid4().hex}_{safe_name}"
         file_path = uploads_dir / filename
-        content = await image.read()
-
         with open(file_path, "wb") as f:
             f.write(content)
-
         image_urls.append(f"{base_url}/uploads/products/{filename}")
 
     return image_urls
