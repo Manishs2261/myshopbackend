@@ -617,3 +617,79 @@ async def change_password(
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get the currently logged-in user's info."""
     return current_user
+
+
+# ─── Authenticated Email / Phone Verification ─────────────────────────────────
+
+@router.post("/verify/email/send", response_model=dict)
+async def send_email_verification_otp(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.email:
+        raise HTTPException(status_code=400, detail="No email address on account")
+    otp = generate_otp(6)
+    expires = datetime.utcnow() + timedelta(minutes=10)
+    current_user.otp_code = otp
+    current_user.otp_expires_at = expires
+    await db.commit()
+    background_tasks.add_task(send_reset_email, current_user.email, otp)
+    return {"message": f"OTP sent to {current_user.email}", "expires_in_seconds": 600, "__dev_otp": otp}
+
+
+@router.post("/verify/email/confirm", response_model=dict)
+async def confirm_email_verification(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    otp = payload.get("otp", "")
+    if not current_user.otp_code:
+        raise HTTPException(status_code=400, detail="No OTP found. Request a new one.")
+    if datetime.utcnow() > current_user.otp_expires_at:
+        raise HTTPException(status_code=400, detail="OTP expired. Request a new one.")
+    if current_user.otp_code != otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    current_user.is_email_verified = True
+    current_user.otp_code = None
+    current_user.otp_expires_at = None
+    await db.commit()
+    return {"message": "Email verified successfully"}
+
+
+@router.post("/verify/phone/send", response_model=dict)
+async def send_phone_verification_otp(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user.phone:
+        raise HTTPException(status_code=400, detail="No phone number on account")
+    otp = generate_otp(6)
+    expires = datetime.utcnow() + timedelta(minutes=10)
+    current_user.otp_code = otp
+    current_user.otp_expires_at = expires
+    await db.commit()
+    background_tasks.add_task(send_otp_sms, current_user.phone, otp)
+    return {"message": f"OTP sent to phone", "expires_in_seconds": 600, "__dev_otp": otp}
+
+
+@router.post("/verify/phone/confirm", response_model=dict)
+async def confirm_phone_verification(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    otp = payload.get("otp", "")
+    if not current_user.otp_code:
+        raise HTTPException(status_code=400, detail="No OTP found. Request a new one.")
+    if datetime.utcnow() > current_user.otp_expires_at:
+        raise HTTPException(status_code=400, detail="OTP expired. Request a new one.")
+    if current_user.otp_code != otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    current_user.is_phone_verified = True
+    current_user.otp_code = None
+    current_user.otp_expires_at = None
+    await db.commit()
+    return {"message": "Phone verified successfully"}
