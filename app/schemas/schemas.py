@@ -151,10 +151,10 @@ class ChangePasswordRequest(BaseModel):
 # ─── User ──────────────────────────────────────────────────────────────────
 
 class UserBase(BaseModel):
-    name: Optional[str]
-    email: Optional[str]
-    phone: Optional[str]
-    avatar_url: Optional[str]
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class UserUpdate(UserBase):
