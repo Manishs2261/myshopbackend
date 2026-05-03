@@ -1,5 +1,6 @@
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import urlparse, unquote
 from uuid import uuid4
 
 import httpx
@@ -14,6 +15,14 @@ class StorageUploadError(Exception):
 
 def supabase_storage_enabled() -> bool:
     return bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY and settings.SUPABASE_STORAGE_BUCKET)
+
+
+def _supabase_object_path_from_public_url(file_url: str) -> str | None:
+    base_url = settings.SUPABASE_URL.rstrip("/")
+    public_prefix = f"{base_url}/storage/v1/object/public/{settings.SUPABASE_STORAGE_BUCKET}/"
+    if not file_url.startswith(public_prefix):
+        return None
+    return unquote(file_url[len(public_prefix):])
 
 
 def _compress_image(content: bytes, filename: str) -> tuple[bytes, str, str]:
@@ -69,3 +78,40 @@ async def upload_product_image(file_bytes: bytes, original_filename: str, vendor
         raise StorageUploadError(f"Supabase upload failed: {response.status_code} {response.text}")
 
     return public_url
+
+
+async def delete_product_images(image_urls: list[str]) -> None:
+    if not image_urls:
+        return
+
+    if supabase_storage_enabled():
+        object_paths = [
+            object_path
+            for url in image_urls
+            if (object_path := _supabase_object_path_from_public_url(url))
+        ]
+        if not object_paths:
+            return
+
+        base_url = settings.SUPABASE_URL.rstrip("/")
+        delete_url = f"{base_url}/storage/v1/object/{settings.SUPABASE_STORAGE_BUCKET}"
+        headers = {
+            "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+            "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.request("DELETE", delete_url, headers=headers, json={"prefixes": object_paths})
+
+        if response.status_code >= 400:
+            raise StorageUploadError(f"Supabase delete failed: {response.status_code} {response.text}")
+        return
+
+    for url in image_urls:
+        parsed = urlparse(url)
+        path = Path(unquote(parsed.path.lstrip("/")))
+        if path.parts[:2] == ("uploads", "products"):
+            file_path = Path(*path.parts)
+            if file_path.exists():
+                file_path.unlink()

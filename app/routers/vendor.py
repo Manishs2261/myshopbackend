@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError, DataError, StatementError
 from typing import List
 from datetime import datetime, timedelta
 from app.core.database import get_db
-from app.core.storage import upload_product_image, supabase_storage_enabled, StorageUploadError
+from app.core.storage import upload_product_image, delete_product_images, supabase_storage_enabled, StorageUploadError
 from app.core.security import require_role
 from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings
 from app.schemas.schemas import (
@@ -583,10 +583,17 @@ async def _generate_unique_product_slug(
 
 
 def _serialize_product(product: Product) -> dict:
+    normalized_status = {
+        "pending": "active",
+        "approved": "active",
+        "rejected": "inactive",
+    }.get((product.status or "").lower(), product.status)
+
     return {
         "id": product.id,
         "vendor_id": product.vendor_id,
         "category_id": product.category_id,
+        "category_name": product.category.name if getattr(product, "category", None) else None,
         "name": product.name,
         "slug": product.slug,
         "description": product.description,
@@ -596,7 +603,7 @@ def _serialize_product(product: Product) -> dict:
         "discount_percentage": product.discount_percentage,
         "stock": product.stock,
         "unit": product.unit,
-        "status": product.status,
+        "status": normalized_status,
         "rating": product.rating,
         "review_count": product.review_count,
         "images": product.images or [],
@@ -619,6 +626,15 @@ def _serialize_product(product: Product) -> dict:
         "created_at": product.created_at.isoformat() if product.created_at else None,
         "updated_at": product.updated_at.isoformat() if product.updated_at else None,
     }
+
+
+def _normalize_vendor_product_status_input(status: str | None) -> str:
+    normalized = (status or "active").lower()
+    return {
+        "pending": "active",
+        "approved": "active",
+        "rejected": "inactive",
+    }.get(normalized, normalized)
 
 
 def _parse_filter_datetime(value: str | None, end_of_day: bool = False) -> datetime | None:
@@ -656,7 +672,7 @@ async def create_product(
     product_dict = {
         "vendor_id": vendor.id,
         "slug": unique_slug,
-        "status": product_data.get("status") or "active",
+        "status": _normalize_vendor_product_status_input(product_data.get("status")),
         "images": image_urls,
         "name": product_data.get("name"),
         "description": product_data.get("description"),
@@ -692,9 +708,11 @@ async def create_product(
 
         await db.commit()
         result = await db.execute(
-            select(Product).where(Product.id == product.id).options(selectinload(Product.variants))
+            select(Product)
+            .where(Product.id == product.id)
+            .options(selectinload(Product.variants), selectinload(Product.category))
         )
-        return result.scalar_one()
+        return _serialize_product(result.scalar_one())
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=_product_error_message(e, "create")) from e
@@ -791,7 +809,7 @@ async def list_vendor_products(
 
     offset = (page - 1) * limit
     result = await db.execute(
-        query.offset(offset).limit(limit).options(selectinload(Product.variants))
+        query.offset(offset).limit(limit).options(selectinload(Product.variants), selectinload(Product.category))
     )
     products = result.scalars().all()
     
@@ -814,12 +832,12 @@ async def get_vendor_product(
     vendor = await get_vendor(current_user, db)
     result = await db.execute(
         select(Product).where(Product.id == product_id, Product.vendor_id == vendor.id)
-        .options(selectinload(Product.variants))
+        .options(selectinload(Product.variants), selectinload(Product.category))
     )
     product = result.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    return product
+    return _serialize_product(product)
 
 
 @router.put("/products/{product_id}", response_model=ProductResponse)
@@ -832,7 +850,7 @@ async def update_product(
     vendor = await get_vendor(current_user, db)
     result = await db.execute(
         select(Product).where(Product.id == product_id, Product.vendor_id == vendor.id)
-        .options(selectinload(Product.variants))
+        .options(selectinload(Product.variants), selectinload(Product.category))
     )
     product = result.scalar_one_or_none()
     if not product:
@@ -851,26 +869,26 @@ async def update_product(
         "discount_percentage",
         "stock", "unit", "tags", "specifications", "status"
     ]
-    previous_price = product.price
-    previous_description = product.description
-
     try:
+        previous_images = list(product.images or [])
+
         for field in updatable_fields:
             if field in product_data:
-                setattr(product, field, product_data[field])
+                if field == "status":
+                    setattr(product, field, _normalize_vendor_product_status_input(product_data[field]))
+                else:
+                    setattr(product, field, product_data[field])
 
-        if new_images:
+        kept_images = product_data.get("images") if isinstance(product_data.get("images"), list) else None
+        if new_images and kept_images is not None:
+            product.images = kept_images + new_images
+        elif new_images:
             product.images = new_images
-        elif "images" in product_data and isinstance(product_data["images"], list):
-            product.images = product_data["images"]
+        elif kept_images is not None:
+            product.images = kept_images
 
         product.slug = next_slug
-
-        if (
-            ("price" in product_data and product.price != previous_price) or
-            ("description" in product_data and product.description != previous_description)
-        ):
-            product.status = "pending"
+        removed_images = [url for url in previous_images if url not in (product.images or [])]
 
         if "variants" in product_data:
             await db.execute(
@@ -891,9 +909,13 @@ async def update_product(
 
         await db.commit()
         result = await db.execute(
-            select(Product).where(Product.id == product.id).options(selectinload(Product.variants))
+            select(Product)
+            .where(Product.id == product.id)
+            .options(selectinload(Product.variants), selectinload(Product.category))
         )
-        return result.scalar_one()
+        if removed_images:
+            await delete_product_images(removed_images)
+        return _serialize_product(result.scalar_one())
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=_product_error_message(e, "update")) from e
