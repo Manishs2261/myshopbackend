@@ -184,6 +184,25 @@ function previewOnlyMode(){
   return params.get('preview') === '1';
 }
 
+function loadStoredPreviewPayload(){
+  try{
+    const sessionRaw = sessionStorage.getItem('marketplace_preview_payload');
+    if(sessionRaw){
+      sessionStorage.removeItem('marketplace_preview_payload');
+      return JSON.parse(sessionRaw);
+    }
+    const params = new URLSearchParams(window.location.search);
+    const previewKey = params.get('preview_key');
+    if(!previewKey) return null;
+    const raw = localStorage.getItem(previewKey);
+    if(!raw) return null;
+    localStorage.removeItem(previewKey);
+    return JSON.parse(raw);
+  }catch(error){
+    return null;
+  }
+}
+
 function applyTheme(storefront){
   const theme = storefront.theme || {};
   const fontFamily = theme.fontFamily && theme.fontFamily !== 'DM Sans' ? `'${theme.fontFamily}', 'DM Sans', sans-serif` : `'DM Sans', sans-serif`;
@@ -348,6 +367,16 @@ window.addEventListener('message', (event) => {
 async function loadStorefront(){
   if(previewOnlyMode()){
     document.body.classList.add('preview-mode');
+    const previewPayload = loadStoredPreviewPayload();
+    if(previewPayload && previewPayload.storefront){
+      state.storefront = previewPayload.storefront;
+      state.products = previewPayload.products || [];
+      state.categories = previewPayload.categories || [];
+      renderStorefront();
+      startAuto();
+      return;
+    }
+    document.body.innerHTML = '<div style="padding:80px 24px;text-align:center;font-family:DM Sans,sans-serif;color:#6b5c45">Unable to load this storefront right now.</div>';
     return;
   }
   const slug = slugFromPath();

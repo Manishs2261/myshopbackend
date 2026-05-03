@@ -8,58 +8,59 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--cream:#faf8f5;--warm:#f0ebe2;--accent:#c8a96e;--dark:#1a1208;--mid:#6b5c45;--light:#ede8df}
-body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);font-size:14px}
-.app{display:flex;height:100vh;overflow:hidden}
-.panel{width:420px;min-width:420px;background:#fff;border-right:1px solid var(--light);display:flex;flex-direction:column}
-.panel-header{background:var(--dark);padding:20px 24px;color:#fff}
+body{font-family:'DM Sans',sans-serif;background:linear-gradient(180deg,#f8f4ed 0%,#efe8db 100%);color:var(--dark);font-size:14px}
+.app{display:block;height:100vh;overflow:hidden;padding:24px}
+.panel{width:min(1180px,100%);height:calc(100vh - 48px);margin:0 auto;background:#fff;border:1px solid #eadfce;border-radius:24px;box-shadow:0 18px 50px rgba(58,35,10,.08);display:flex;flex-direction:column;overflow:hidden}
+.panel-header{background:var(--dark);padding:16px 18px;color:#fff}
 .panel-header-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-.panel-title{font-family:'Playfair Display',serif;font-size:18px;margin-bottom:4px}
-.panel-subtitle{font-size:12px;color:#e8d5b0}
+.panel-title{font-family:'Playfair Display',serif;font-size:22px;margin-bottom:4px}
+.panel-subtitle{font-size:13px;color:#e8d5b0}
 .status-pill{font-size:11px}
 .status-pill.live{color:#4caf50}
 .status-pill.draft{color:var(--accent)}
-.editor{display:grid;grid-template-columns:260px 1fr;min-height:0;flex:1}
+.editor{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:0;flex:1;background:#fcfaf7}
 .left-nav{display:flex;flex-direction:column;min-height:0;border-right:1px solid #282343;background:#141324;color:#b2addf}
-.left-nav-scroll{overflow:auto;padding:22px 16px 18px}
-.sidebar-brand{padding:2px 8px 18px}
-.brand-row{display:flex;align-items:center;gap:14px}
-.brand-mark{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#6672ff 0%,#61c1df 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;font-weight:500}
-.brand-copy{display:flex;flex-direction:column;gap:6px}
+.left-nav-scroll{overflow:auto;padding:18px 14px 16px}
+.sidebar-brand{padding:2px 4px 18px;display:flex;justify-content:flex-start}
+.brand-row{display:flex;align-items:center;justify-content:flex-start;gap:12px}
+.brand-mark{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#6672ff 0%,#61c1df 100%);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:500}
+.brand-copy,.marketplace-nav-title,.marketplace-nav-copy,.nav-group-title,.drawer-link-text{display:flex}
+.brand-copy{flex-direction:column;gap:6px}
 .brand-name{font-size:18px;font-weight:500;color:#fff}
 .brand-badge{display:inline-flex;align-items:center;width:max-content;padding:5px 14px;border-radius:8px;background:#2a2752;color:#8d88d9;font-size:11px;letter-spacing:.12em;text-transform:uppercase}
-.sidebar-divider{height:1px;background:#2a2641;margin:18px 8px}
-.marketplace-nav-card{margin:0 8px 18px;padding:14px;border:1px solid #2d2950;border-radius:14px;background:linear-gradient(180deg,#1a1830 0%,#171628 100%)}
-.marketplace-nav-title{font-size:11px;color:#67639a;letter-spacing:.16em;text-transform:uppercase;margin-bottom:8px}
-.marketplace-nav-copy{font-size:12px;line-height:1.6;color:#9a96c9;margin-bottom:12px}
-.marketplace-nav-btn{display:flex;align-items:center;justify-content:space-between;width:100%;padding:11px 12px;border:none;border-radius:10px;background:#2a2752;color:#fff;font-size:13px;font-family:inherit;cursor:pointer}
+.sidebar-divider{height:1px;background:#2a2641;margin:14px 0}
+.marketplace-nav-card{margin:0 0 16px;padding:12px;border:1px solid #2d2950;border-radius:16px;background:linear-gradient(180deg,#1a1830 0%,#171628 100%)}
+.marketplace-nav-title{font-size:11px;color:#8f8bc0;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
+.marketplace-nav-copy{font-size:12px;line-height:1.5;color:#b4afd9;margin-bottom:10px}
+.marketplace-nav-btn{display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px 12px;border:none;border-radius:10px;background:#2a2752;color:#fff;font-size:12px;font-family:inherit;cursor:pointer}
 .marketplace-nav-btn:hover{background:#35316a}
-.nav-group{padding:0 0 16px}
-.nav-group-title{padding:0 12px 10px;font-size:11px;color:#67639a;letter-spacing:.18em;text-transform:uppercase}
-.drawer-link{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:12px;background:transparent;color:#8f8bc0;font-size:13px;cursor:pointer;transition:all .2s}
+.nav-group{padding:0 0 10px}
+.nav-group-title{padding:0 10px 8px;font-size:11px;color:#8f8bc0;letter-spacing:.12em;text-transform:uppercase}
+.drawer-link{display:flex;align-items:center;justify-content:flex-start;gap:12px;padding:11px 12px;border-radius:12px;background:transparent;color:#8f8bc0;font-size:13px;cursor:pointer;transition:all .2s;text-decoration:none}
 .drawer-link:hover{background:#1c1a33;color:#fff}
 .drawer-link.active{background:#2a2752;color:#fff;font-weight:500;position:relative}
 .drawer-link.active::after{content:"";position:absolute;right:0;top:10px;bottom:10px;width:4px;border-radius:4px;background:#6f6bff}
-.drawer-link-code{width:22px;flex:0 0 22px;color:#7e79b8;font-size:18px;line-height:1;text-align:center}
+.drawer-link-code{width:22px;flex:0 0 22px;color:#7e79b8;font-size:16px;line-height:1;text-align:center}
 .drawer-link.active .drawer-link-code{color:#b6b3ff}
-.drawer-link-text{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:1}
 .drawer-link-meta{color:#6f6bff;font-weight:500}
-.tabs{padding:0;overflow:auto}
-.tab-btn{width:100%;text-align:left;padding:12px 14px;border:none;background:transparent;font-size:13px;color:#8f8bc0;border-radius:12px;cursor:pointer;display:flex;align-items:center;gap:14px}
-.tab-btn::before{content:attr(data-short);width:22px;flex:0 0 22px;text-align:center;font-size:18px;color:#7e79b8}
+.tabs{padding:0;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.tab-btn{width:100%;text-align:left;padding:12px 14px;border:none;background:transparent;font-size:13px;color:#8f8bc0;border-radius:12px;cursor:pointer;display:flex;align-items:center;justify-content:flex-start;gap:12px}
+.tab-btn::before{content:attr(data-short);width:24px;height:24px;flex:0 0 24px;display:flex;align-items:center;justify-content:center;border-radius:999px;background:#1c1a33;font-size:11px;color:#b9b4ea}
 .tab-btn:hover{background:#1c1a33;color:#fff}
 .tab-btn.active{background:#2a2752;color:#fff;font-weight:500;position:relative}
 .tab-btn.active::after{content:"";position:absolute;right:0;top:10px;bottom:10px;width:4px;border-radius:4px;background:#6f6bff}
-.form-scroll{overflow:auto;padding:20px 20px 90px}
-.setup-card{background:linear-gradient(180deg,#fffaf1 0%,#fff 100%);border:1px solid #f1dfbf;border-radius:16px;padding:18px 18px 16px;margin-bottom:18px}
+.form-scroll{overflow:auto;padding:24px 26px 110px}
+.setup-card{background:linear-gradient(180deg,#fffaf1 0%,#fff 100%);border:1px solid #f1dfbf;border-radius:18px;padding:18px 18px 16px;margin-bottom:18px}
 .setup-eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
-.setup-title{font-family:'Playfair Display',serif;font-size:22px;color:var(--dark);margin-bottom:8px}
-.setup-copy{font-size:13px;line-height:1.7;color:var(--mid);margin-bottom:14px}
-.setup-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.setup-step{background:#fff;border:1px solid var(--light);border-radius:12px;padding:12px}
+.setup-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--dark);margin-bottom:6px}
+.setup-copy{font-size:12px;line-height:1.6;color:var(--mid);margin-bottom:12px}
+.setup-steps{display:grid;grid-template-columns:1fr;gap:8px}
+.setup-step{background:#fff;border:1px solid var(--light);border-radius:12px;padding:10px}
 .setup-step-no{width:24px;height:24px;border-radius:50%;background:var(--dark);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;margin-bottom:8px}
 .setup-step-title{font-size:12px;font-weight:500;color:var(--dark);margin-bottom:4px}
 .setup-step-copy{font-size:11px;line-height:1.5;color:var(--mid)}
-.tab-panel{display:none}
+.quick-preview-btn{width:100%;margin-top:2px;pointer-events:auto;position:relative;z-index:22}
+.tab-panel{display:none;background:#fff;border:1px solid #eee2cf;border-radius:18px;padding:18px 18px 8px;box-shadow:0 8px 20px rgba(58,35,10,.04)}
 .tab-panel.active{display:block}
 .tab-intro{margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--light)}
 .tab-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--dark);margin-bottom:4px}
@@ -95,34 +96,36 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 .slug-row{display:flex;align-items:center;border:1px solid var(--light);border-radius:8px;overflow:hidden}
 .slug-prefix{padding:10px 12px;background:var(--cream);font-size:12px;color:var(--mid);border-right:1px solid var(--light)}
 .slug-row input{border:none;border-radius:0}
-.action-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid var(--light);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.action-bar{position:sticky;bottom:0;z-index:20;background:rgba(255,255,255,.98);backdrop-filter:blur(8px);border-top:1px solid var(--light);padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .save-note{font-size:11px;color:var(--mid)}
-.actions{display:flex;gap:10px}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:relative;z-index:21}
 .text-btn{border:none;background:transparent;color:var(--mid);font-size:12px;cursor:pointer}
-.btn{border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-family:inherit;cursor:pointer}
+.btn{display:inline-flex;align-items:center;justify-content:center;border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-family:inherit;cursor:pointer;text-decoration:none;pointer-events:auto;position:relative;z-index:22}
 .btn-secondary{background:var(--warm);color:var(--dark);border:1px solid var(--light)}
 .btn-primary{background:var(--accent);color:#fff;font-weight:500}
 .badge-warning{background:#fff3cd;color:#856404;border-radius:12px;font-size:10px;padding:3px 10px}
-.preview{flex:1;display:flex;flex-direction:column;min-width:0}
-.preview-toolbar{background:#fff;border-bottom:1px solid var(--light);padding:10px 20px;display:flex;justify-content:space-between;align-items:center;gap:16px}
+.preview{display:none}
+.preview-toolbar{background:#fff;border-bottom:1px solid var(--light);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .preview-label{font-size:12px;color:var(--mid);letter-spacing:.08em;text-transform:uppercase}
 .device-toggle{display:flex;gap:8px}
 .device-btn{background:transparent;color:var(--mid);border:none;padding:6px 12px;font-size:11px;border-radius:6px;cursor:pointer}
 .device-btn.active{background:var(--dark);color:#fff}
 .preview-launch{background:var(--dark);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-family:inherit;cursor:pointer}
 .preview-launch:hover{background:var(--accent)}
+.preview-close{background:transparent;color:var(--mid);border:none;font-size:18px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:8px}
+.preview-close:hover{background:var(--warm);color:var(--dark)}
 .preview-open{font-size:12px;color:var(--accent);font-weight:500}
-.preview-scroll{flex:1;overflow:auto;padding:20px;background:var(--cream)}
-.preview-stage{display:flex;justify-content:center}
-.preview-placeholder{width:min(720px,100%);background:linear-gradient(180deg,#fffaf1 0%,#fff 100%);border:1px solid #f1dfbf;border-radius:16px;padding:28px;text-align:center;color:var(--mid)}
+.preview-scroll{flex:1;overflow:auto;padding:16px;background:#f6f1e8}
+.preview-stage{display:flex;justify-content:center;align-items:flex-start}
+.preview-placeholder{width:min(520px,100%);background:linear-gradient(180deg,#fffaf1 0%,#fff 100%);border:1px solid #f1dfbf;border-radius:16px;padding:24px;text-align:center;color:var(--mid)}
 .preview-placeholder-title{font-family:'Playfair Display',serif;font-size:24px;color:var(--dark);margin-bottom:8px}
 .preview-placeholder-copy{font-size:13px;line-height:1.7;margin-bottom:16px}
-.preview-shell{background:#fff;border-radius:12px;border:1px solid var(--light);overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.06);transform-origin:top center}
+.preview-shell{width:min(520px,100%);background:#fff;border-radius:12px;border:1px solid var(--light);overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.06);transform-origin:top center}
 .preview-shell iframe{display:block;border:none;background:#fff}
-.toast-stack{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:flex;flex-direction:column;gap:10px;z-index:50}
+.toast-stack{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:flex;flex-direction:column;gap:10px;z-index:50;pointer-events:none}
 .toast{background:var(--dark);color:#fff;border-radius:8px;padding:12px 20px;font-size:13px;animation:slide-up .25s ease}
 @keyframes slide-up{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
-@media (max-width:1080px){.app{flex-direction:column;height:auto}.panel{width:100%;min-width:0;height:auto}.preview{min-height:70vh}.editor{grid-template-columns:1fr}.left-nav{border-right:none;border-bottom:1px solid #282343}.left-nav-scroll{padding:14px}.sidebar-brand{padding:4px 0 14px}.sidebar-divider{margin:14px 0}.tabs{display:flex;overflow:auto}.nav-group{padding-bottom:10px}.drawer-link,.tab-btn{white-space:nowrap}.drawer-link.active::after,.tab-btn.active::after{display:none}.setup-steps{grid-template-columns:1fr}}
+@media (max-width:1080px){.app{height:auto;padding:12px}.panel{width:100%;height:auto;min-width:0}.editor{grid-template-columns:1fr}.left-nav{border-right:none;border-bottom:1px solid #282343}.left-nav-scroll{padding:14px}.sidebar-brand{padding:4px 0 14px;justify-content:flex-start}.sidebar-divider{margin:14px 0}.tabs{display:flex;overflow:auto;gap:8px}.nav-group{padding-bottom:10px}.drawer-link,.tab-btn{white-space:nowrap;justify-content:flex-start;font-size:13px}.tab-btn{font-size:13px;gap:10px;min-width:max-content}.drawer-link.active::after,.tab-btn.active::after{display:none}.setup-steps{grid-template-columns:1fr}.action-bar{flex-wrap:wrap}}
 </style>
 </head>
 <body>
@@ -131,10 +134,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
     <div class="panel-header">
       <div class="panel-header-top">
         <div>
-          <div class="panel-title">Storefront Settings</div>
-          <div class="panel-subtitle">Customize your vendor storefront with a live BazaarCraft preview.</div>
+          <div class="panel-title">Marketplace Settings</div>
+          <div class="panel-subtitle">Fill in your store details, check the preview, then publish when everything looks right.</div>
         </div>
-        <div class="status-pill draft" id="status-pill">○ Draft</div>
+        <div class="status-pill draft" id="status-pill">Draft</div>
       </div>
     </div>
 
@@ -155,8 +158,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
             <div class="marketplace-nav-title">Marketplace</div>
             <div class="marketplace-nav-copy">Open the BazaarCraft marketplace directory and browse vendor storefronts.</div>
             <button class="marketplace-nav-btn" type="button" onclick="window.location.href='/marketplace'">
-              <span>Go to Marketplace</span>
-              <span>↗</span>
+              <span>Open Marketplace</span>
+              <span>></span>
             </button>
           </div>
           <div class="nav-group">
@@ -165,21 +168,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
               <span class="drawer-link-code">M</span>
               <span class="drawer-link-text">
                 <span>Marketplace</span>
-                <span class="drawer-link-meta">↗</span>
+                <span class="drawer-link-meta">Open</span>
               </span>
             </a>
             <a class="drawer-link" id="drawer-storefront-link" href="/marketplace/preview" target="_blank" rel="noreferrer">
               <span class="drawer-link-code">S</span>
               <span class="drawer-link-text">
                 <span>Storefront</span>
-                <span class="drawer-link-meta">↗</span>
+                <span class="drawer-link-meta">Open</span>
               </span>
             </a>
             <a class="drawer-link active" href="/settings/marketplace">
               <span class="drawer-link-code">T</span>
               <span class="drawer-link-text">
                 <span>Settings</span>
-                <span class="drawer-link-meta">•</span>
+                <span class="drawer-link-meta">Here</span>
               </span>
             </a>
           </div>
@@ -193,32 +196,33 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
 
       <div class="form-scroll">
         <div class="setup-card">
-          <div class="setup-eyebrow">Quick Setup</div>
-          <div class="setup-title">Build a storefront customers can trust</div>
-          <div class="setup-copy">Start with your name and logo, then shape the banner, products, and links. Every change appears instantly in the preview on the right.</div>
+          <div class="setup-eyebrow">Easy Setup</div>
+          <div class="setup-title">Set up your marketplace page</div>
+          <div class="setup-copy">Use these sections one by one. Start with your store details, then update the design, and finally preview your page before publishing.</div>
           <div class="setup-steps">
             <div class="setup-step">
               <div class="setup-step-no">1</div>
-              <div class="setup-step-title">Add your brand</div>
-              <div class="setup-step-copy">Set your store name, tagline, and logo so shoppers know who you are.</div>
+              <div class="setup-step-title">Store details</div>
+              <div class="setup-step-copy">Add your name, logo, and contact information.</div>
             </div>
             <div class="setup-step">
               <div class="setup-step-no">2</div>
-              <div class="setup-step-title">Shape the page</div>
-              <div class="setup-step-copy">Choose colors, banner text, and layout to match your style.</div>
+              <div class="setup-step-title">Page design</div>
+              <div class="setup-step-copy">Choose colors, banner text, and product layout.</div>
             </div>
             <div class="setup-step">
               <div class="setup-step-no">3</div>
-              <div class="setup-step-title">Publish with confidence</div>
-              <div class="setup-step-copy">Review the live preview, save a draft, then publish when it feels right.</div>
+              <div class="setup-step-title">Preview and publish</div>
+              <div class="setup-step-copy">Open your page preview, save draft, and publish when ready.</div>
             </div>
           </div>
+          <button class="btn btn-primary quick-preview-btn" id="quick-preview-btn" type="button">Preview My Store</button>
         </div>
 
-        <section class="tab-panel active" data-tab="Branding">
+        <section class="tab-panel active" data-tab="Store Details">
           <div class="tab-intro">
-            <div class="tab-title">Brand basics</div>
-            <div class="tab-copy">These details appear first in your storefront header and help customers recognize your shop instantly.</div>
+            <div class="tab-title">Store details</div>
+            <div class="tab-copy">Add the basic information customers should see first when they open your marketplace page.</div>
           </div>
           <div class="field"><label for="store-name">Store Name</label><input class="input" id="store-name" type="text"></div>
           <div class="field"><label for="tagline">Tagline</label><input class="input" id="tagline" type="text"><div class="field-help">A short one-line promise that tells shoppers what makes your store special.</div></div>
@@ -231,10 +235,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
           </div>
         </section>
 
-        <section class="tab-panel" data-tab="Look & Feel">
+        <section class="tab-panel" data-tab="Colors & Fonts">
           <div class="tab-intro">
-            <div class="tab-title">Look and feel</div>
-            <div class="tab-copy">Choose colors and type styles that make the storefront feel closer to your brand.</div>
+            <div class="tab-title">Colors and fonts</div>
+            <div class="tab-copy">Choose the colors and text style that best match your store.</div>
           </div>
           <div class="row">
             <div class="field"><label>Primary Color</label><div class="row"><input class="color-box" id="primary-color" type="color"><input class="input" id="primary-color-text" type="text"></div></div>
@@ -244,10 +248,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
           <div class="field"><label for="font-family">Font Family</label><select class="select" id="font-family"><option>DM Sans</option><option>Lato</option><option>Nunito</option><option>Raleway</option><option>Josefin Sans</option></select></div>
         </section>
 
-        <section class="tab-panel" data-tab="Hero Banner">
+        <section class="tab-panel" data-tab="Top Banner">
           <div class="tab-intro">
-            <div class="tab-title">Hero banner</div>
-            <div class="tab-copy">This is the big first impression section at the top of your store. Keep the message short and clear.</div>
+            <div class="tab-title">Top banner</div>
+            <div class="tab-copy">This is the first large section customers will see. Keep the message short and clear.</div>
           </div>
           <div class="field"><div class="field-title">Banner Image Upload</div><label class="upload-zone" for="banner-upload"><img class="upload-preview" id="banner-preview" style="display:none"><span id="banner-copy">Upload a hero image for the first slide</span></label><input id="banner-upload" type="file" accept="image/*" hidden></div>
           <div class="field"><label for="slide-tag">Headline Tag</label><input class="input" id="slide-tag" type="text"></div>
@@ -263,7 +267,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
         <section class="tab-panel" data-tab="Page Layout">
           <div class="tab-intro">
             <div class="tab-title">Page layout</div>
-            <div class="tab-copy">Pick the structure that makes your products easiest to browse.</div>
+            <div class="tab-copy">Choose how your store page should be arranged for easier browsing.</div>
           </div>
           <div class="field">
             <div class="field-title">Layout Style</div>
@@ -271,10 +275,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
           </div>
         </section>
 
-        <section class="tab-panel" data-tab="Products">
+        <section class="tab-panel" data-tab="Product Display">
           <div class="tab-intro">
-            <div class="tab-title">Product sections</div>
-            <div class="tab-copy">Decide how many products to show and which ones deserve the spotlight.</div>
+            <div class="tab-title">Product display</div>
+            <div class="tab-copy">Choose how many products to show and highlight the products you want customers to notice first.</div>
           </div>
           <div class="toggle-row"><span>Show Featured Products section</span><div class="toggle" id="toggle-featured"></div></div>
           <div class="field">
@@ -291,18 +295,18 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
           </div>
         </section>
 
-        <section class="tab-panel" data-tab="About">
+        <section class="tab-panel" data-tab="About Store">
           <div class="tab-intro">
             <div class="tab-title">About your store</div>
-            <div class="tab-copy">Tell customers what you make, where it comes from, and why your work matters.</div>
+            <div class="tab-copy">Write a short introduction so customers understand your story and what you sell.</div>
           </div>
           <div class="field"><label for="about-text">About Text</label><textarea class="textarea" id="about-text" rows="8"></textarea><div class="counter" id="about-counter">0 / 500</div></div>
         </section>
 
-        <section class="tab-panel" data-tab="Social Links">
+        <section class="tab-panel" data-tab="Contact & Social">
           <div class="tab-intro">
-            <div class="tab-title">Social links</div>
-            <div class="tab-copy">Add the places where customers can message you, follow you, or learn more.</div>
+            <div class="tab-title">Contact and social links</div>
+            <div class="tab-copy">Add the links customers can use to contact you, follow you, or learn more.</div>
           </div>
           <div class="social-row"><div class="social-icon">⌂</div><input class="input" id="social-website" type="text" placeholder="Website"></div>
           <div class="social-row"><div class="social-icon">I</div><input class="input" id="social-instagram" type="text" placeholder="Instagram"></div>
@@ -312,10 +316,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
           <div class="social-row"><div class="social-icon">@</div><input class="input" id="social-email" type="text" placeholder="Email"></div>
         </section>
 
-        <section class="tab-panel" data-tab="SEO & URL">
+        <section class="tab-panel" data-tab="Store Link">
           <div class="tab-intro">
-            <div class="tab-title">SEO and store URL</div>
-            <div class="tab-copy">Write a simple search title, description, and memorable store link.</div>
+            <div class="tab-title">Store link and search details</div>
+            <div class="tab-copy">Set the page title, description, and store link that customers and search engines will see.</div>
           </div>
           <div class="field"><label for="meta-title">Meta Title</label><input class="input" id="meta-title" type="text"><div class="counter" id="meta-title-counter">0 / 60</div></div>
           <div class="field"><label for="meta-description">Meta Description</label><textarea class="textarea" id="meta-description" rows="4"></textarea><div class="counter" id="meta-description-counter">0 / 160</div></div>
@@ -330,43 +334,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--dark);
         <span class="badge-warning" id="unpublished-badge" style="display:none">Unpublished changes</span>
       </div>
       <div class="actions">
-        <span class="save-note">Preview updates instantly. Save when you're ready.</span>
+        <span class="save-note">Preview your store anytime, then save draft or publish.</span>
+        <button class="btn btn-secondary" id="bottom-preview-btn" type="button">Preview My Store</button>
         <button class="btn btn-secondary" id="save-draft-btn" type="button">Save Draft</button>
         <button class="btn btn-primary" id="publish-btn" type="button">Publish</button>
       </div>
     </div>
   </section>
 
-  <section class="preview">
-    <div class="preview-toolbar">
-      <div class="preview-label">Live Preview</div>
-      <div class="device-toggle" id="device-toggle"></div>
-      <button class="preview-launch" id="preview-launch-btn" type="button">Show Preview</button>
-      <a class="preview-open" id="open-preview" href="/marketplace" target="_blank" rel="noreferrer">Open Full Preview ↗</a>
-    </div>
-    <div class="preview-scroll" id="preview-scroll">
-      <div class="preview-stage">
-        <div class="preview-placeholder" id="preview-placeholder">
-          <div class="preview-placeholder-title">Preview your storefront</div>
-          <div class="preview-placeholder-copy">Click the button below to load the preview page and see your storefront changes.</div>
-          <button class="btn btn-primary" id="preview-placeholder-btn" type="button">Show Preview</button>
-        </div>
-        <div class="preview-shell" id="preview-shell" style="display:none">
-          <iframe id="preview-frame" src="about:blank"></iframe>
-        </div>
-      </div>
-    </div>
-  </section>
 </div>
-
 <div class="toast-stack" id="toast-stack"></div>
 
 <script>
 const API_BASE = window.location.origin.includes(':3000') ? 'http://localhost:8000' : '';
-const tabs = ['Branding','Look & Feel','Hero Banner','Page Layout','Products','About','Social Links','SEO & URL'];
-const devices = {desktop:1000,tablet:768,mobile:390};
+const tabs = ['Store Details','Colors & Fonts','Top Banner','Page Layout','Product Display','About Store','Contact & Social','Store Link'];
 const layoutOptions = ['Modern','Classic','Minimal'];
-const tabShort = {'Branding':'B','Look & Feel':'L','Hero Banner':'H','Page Layout':'P','Products':'P','About':'A','Social Links':'S','SEO & URL':'U'};
+const tabShort = {'Store Details':'1','Colors & Fonts':'2','Top Banner':'3','Page Layout':'4','Product Display':'5','About Store':'6','Contact & Social':'7','Store Link':'8'};
 const state = {
   token: '',
   editor: null,
@@ -374,11 +357,8 @@ const state = {
   published: null,
   products: [],
   categories: [],
-  activeTab: 'Branding',
-  device: 'desktop',
-  isDirty: false,
-  previewReady: false,
-  previewVisible: false
+  activeTab: 'Store Details',
+  isDirty: false
 };
 
 function byId(id){ return document.getElementById(id); }
@@ -502,7 +482,7 @@ function refreshForm(){
 
 function updateStatusUI(){
   const live = !!state.published;
-  byId('status-pill').textContent = live ? '● Live' : '○ Draft';
+  byId('status-pill').textContent = live ? 'Live' : 'Draft';
   byId('status-pill').className = `status-pill ${live ? 'live' : 'draft'}`;
   const hasUnpublished = !state.published || !deepEqual(state.editor, state.published);
   byId('unpublished-badge').style.display = hasUnpublished ? 'inline-flex' : 'none';
@@ -519,7 +499,12 @@ function updatePath(path, value){
     state.editor.seo.slug = slugify(value);
   }
   refreshForm();
+  autoOpenPreviewOnChange();
   pushPreview();
+}
+
+function autoOpenPreviewOnChange(){
+  return;
 }
 
 function bindTextInputs(){
@@ -555,6 +540,7 @@ function bindTextInputs(){
       }
       cursor[path[path.length-1]] = path[path.length-1] === 'slidesCount' ? Number(event.target.value) : event.target.value;
       refreshForm();
+      autoOpenPreviewOnChange();
       pushPreview();
     });
   });
@@ -569,56 +555,25 @@ function bindTextInputs(){
 
 function updatePreviewLink(){
   const slug = state.editor.seo.slug || 'preview';
-  byId('open-preview').href = `/marketplace/${encodeURIComponent(slug)}`;
   byId('drawer-storefront-link').href = `/marketplace/${encodeURIComponent(slug)}`;
 }
 
-function renderDeviceButtons(){
-  byId('device-toggle').innerHTML = Object.keys(devices).map((device) => `<button class="device-btn ${state.device===device?'active':''}" data-device="${device}" type="button">${device[0].toUpperCase()+device.slice(1)}</button>`).join('');
-  byId('device-toggle').querySelectorAll('.device-btn').forEach((button) => button.addEventListener('click', () => {
-    state.device = button.dataset.device;
-    renderDeviceButtons();
-    resizePreview();
-  }));
-}
-
-function ensurePreviewLoaded(){
-  if(state.previewVisible) return;
-  state.previewVisible = true;
-  byId('preview-placeholder').style.display = 'none';
-  byId('preview-shell').style.display = 'block';
-  byId('preview-frame').src = '/marketplace/preview?preview=1';
-  resizePreview();
-}
-
-function resizePreview(){
-  const shell = byId('preview-shell');
-  if(!state.previewVisible) return;
-  const scroll = byId('preview-scroll');
-  const width = devices[state.device];
-  shell.style.width = `${width}px`;
-  const available = scroll.clientWidth - 40;
-  const scale = Math.min(1, available / width);
-  shell.style.transform = `scale(${scale})`;
-  shell.style.marginBottom = `${(1 - scale) * 700}px`;
-  byId('preview-frame').width = width;
-  byId('preview-frame').height = 900;
+function openPreviewPage(event){
+  if(event) event.preventDefault();
+  if(!state.editor) return;
+  const previewPayload = {
+    storefront: state.editor,
+    products: state.products || [],
+    categories: [...new Set((state.products || []).map((product) => product.category_name || 'Uncategorized'))].slice(0, 6),
+    previewMode: true
+  };
+  sessionStorage.setItem('marketplace_preview_payload', JSON.stringify(previewPayload));
+  window.location.href = '/marketplace/preview?preview=1';
 }
 
 function pushPreview(){
   if(!state.editor) return;
   updateStatusUI();
-  if(!state.previewReady || !state.previewVisible) return;
-  const categories = [...new Set(state.products.map((product) => product.category_name || 'Uncategorized'))].slice(0, 6);
-  byId('preview-frame').contentWindow.postMessage({
-    type: 'preview-storefront',
-    payload: {
-      storefront: state.editor,
-      products: state.products,
-      categories,
-      previewMode: true
-    }
-  }, '*');
 }
 
 async function api(method, path, body){
@@ -694,6 +649,7 @@ function handleUpload(inputId, previewId, copyId, path){
         cursor = cursor[path[i]];
       }
       cursor[path[path.length-1]] = result;
+      autoOpenPreviewOnChange();
       pushPreview();
       updateStatusUI();
     };
@@ -713,17 +669,10 @@ function installUnsavedGuard(){
 byId('save-draft-btn').addEventListener('click', saveDraft);
 byId('publish-btn').addEventListener('click', publishStore);
 byId('discard-btn').addEventListener('click', discardChanges);
-byId('preview-launch-btn').addEventListener('click', ensurePreviewLoaded);
-byId('preview-placeholder-btn').addEventListener('click', ensurePreviewLoaded);
-byId('preview-frame').addEventListener('load', () => {
-  state.previewReady = true;
-  resizePreview();
-  pushPreview();
-});
-window.addEventListener('resize', resizePreview);
+byId('quick-preview-btn').addEventListener('click', openPreviewPage);
+byId('bottom-preview-btn').addEventListener('click', openPreviewPage);
 
 renderTabs();
-renderDeviceButtons();
 bindTextInputs();
 handleUpload('logo-upload', 'logo-preview', 'logo-copy', ['branding','logoUrl']);
 handleUpload('favicon-upload', 'favicon-preview', 'favicon-copy', ['branding','faviconUrl']);
