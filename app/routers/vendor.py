@@ -3,6 +3,7 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, cast, String
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, DataError, StatementError
 from typing import List
 from datetime import datetime, timedelta
@@ -1289,6 +1290,7 @@ async def get_marketplace_settings(
 
     if not settings.storefront_draft:
         settings.storefront_draft = build_storefront_defaults(vendor, shop, products)
+        flag_modified(settings, 'storefront_draft')
         sync_legacy_marketplace_fields(settings, settings.storefront_draft)
         await db.commit()
         await db.refresh(settings)
@@ -1307,6 +1309,7 @@ async def update_marketplace_settings(
     settings = await _get_or_create_settings(vendor.id, db)
 
     settings.storefront_draft = merge_dict(build_storefront_defaults(vendor, shop, products), payload or {})
+    flag_modified(settings, 'storefront_draft')
     sync_legacy_marketplace_fields(settings, settings.storefront_draft)
     settings.updated_at = datetime.utcnow()
     await db.commit()
@@ -1329,6 +1332,8 @@ async def publish_marketplace_settings(
 
     settings.storefront_draft = settings.storefront_draft or build_storefront_defaults(vendor, shop, products)
     settings.storefront_published = settings.storefront_draft
+    flag_modified(settings, 'storefront_draft')
+    flag_modified(settings, 'storefront_published')
     settings.storefront_status = "live"
     settings.published_at = datetime.utcnow()
     sync_legacy_marketplace_fields(settings, settings.storefront_draft)
@@ -1353,6 +1358,7 @@ async def reset_marketplace_settings(
 
     settings.theme = "default"
     settings.storefront_draft = build_storefront_defaults(vendor, shop, products)
+    flag_modified(settings, 'storefront_draft')
     sync_legacy_marketplace_fields(settings, settings.storefront_draft)
     settings.custom_css = None
     settings.enable_reviews = True
