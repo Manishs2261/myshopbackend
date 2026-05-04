@@ -35,3 +35,15 @@ async def get_db():
 async def create_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Add columns that create_all won't add to existing tables
+        migrations = [
+            "ALTER TABLE marketplace_settings ADD COLUMN IF NOT EXISTS storefront_draft JSON",
+            "ALTER TABLE marketplace_settings ADD COLUMN IF NOT EXISTS storefront_published JSON",
+            "ALTER TABLE marketplace_settings ADD COLUMN IF NOT EXISTS storefront_status VARCHAR",
+            "ALTER TABLE marketplace_settings ADD COLUMN IF NOT EXISTS published_at TIMESTAMP",
+        ]
+        for sql in migrations:
+            try:
+                await conn.execute(__import__("sqlalchemy").text(sql))
+            except Exception:
+                pass

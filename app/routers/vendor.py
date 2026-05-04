@@ -128,8 +128,8 @@ def normalize_storefront_payload(settings: MarketplaceSettings | None, vendor: V
         payload = settings.storefront_published if published and settings.storefront_published else settings.storefront_draft
     merged = merge_dict(defaults, payload or {})
     slides = merged["banner"].get("slides", [])
-    merged["banner"]["slides"] = slides[:3] if slides else defaults["banner"]["slides"][:1]
-    merged["banner"]["slidesCount"] = max(1, min(3, int(merged["banner"].get("slidesCount", len(merged["banner"]["slides"]) or 1))))
+    merged["banner"]["slides"] = slides[:6] if slides else defaults["banner"]["slides"][:1]
+    merged["banner"]["slidesCount"] = max(1, min(6, int(merged["banner"].get("slidesCount", len(merged["banner"]["slides"]) or 1))))
     return merged
 
 
@@ -1264,34 +1264,44 @@ async def request_payout(
 
 # ─── Marketplace Settings ────────────────────────────────────────────────────────
 
+async def _load_vendor_context(vendor_id: int, db: AsyncSession):
+    """Explicitly load shop and products for a vendor — avoids async lazy-load errors."""
+    shop_res = await db.execute(select(Shop).where(Shop.vendor_id == vendor_id))
+    shop = shop_res.scalar_one_or_none()
+    products_res = await db.execute(select(Product).where(Product.vendor_id == vendor_id))
+    products = list(products_res.scalars().all())
+    return shop, products
+
+
+async def _get_or_create_settings(vendor_id: int, db: AsyncSession) -> MarketplaceSettings:
+    result = await db.execute(
+        select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor_id)
+    )
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = MarketplaceSettings(vendor_id=vendor_id)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return settings
+
+
 @router.get("/marketplace-settings")
 async def get_marketplace_settings(
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get marketplace settings for the vendor"""
     vendor = await get_vendor(current_user, db)
-    await db.refresh(vendor, attribute_names=["shop", "products"])
-    
-    result = await db.execute(
-        select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
-    )
-    settings = result.scalar_one_or_none()
-    
-    if not settings:
-        # Create default settings
-        settings = MarketplaceSettings(vendor_id=vendor.id)
-        db.add(settings)
-        await db.commit()
-        await db.refresh(settings)
-    
+    shop, products = await _load_vendor_context(vendor.id, db)
+    settings = await _get_or_create_settings(vendor.id, db)
+
     if not settings.storefront_draft:
-        settings.storefront_draft = build_storefront_defaults(vendor, vendor.shop, vendor.products)
+        settings.storefront_draft = build_storefront_defaults(vendor, shop, products)
         sync_legacy_marketplace_fields(settings, settings.storefront_draft)
         await db.commit()
         await db.refresh(settings)
 
-    return serialize_editor_state(settings, vendor, vendor.shop, vendor.products)
+    return serialize_editor_state(settings, vendor, shop, products)
 
 
 @router.put("/marketplace-settings")
@@ -1300,29 +1310,19 @@ async def update_marketplace_settings(
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update marketplace settings for the vendor"""
     vendor = await get_vendor(current_user, db)
-    await db.refresh(vendor, attribute_names=["shop", "products"])
-    
-    result = await db.execute(
-        select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
-    )
-    settings = result.scalar_one_or_none()
-    
-    if not settings:
-        # Create settings if they don't exist
-        settings = MarketplaceSettings(vendor_id=vendor.id)
-        db.add(settings)
-    
-    settings.storefront_draft = merge_dict(build_storefront_defaults(vendor, vendor.shop, vendor.products), payload or {})
+    shop, products = await _load_vendor_context(vendor.id, db)
+    settings = await _get_or_create_settings(vendor.id, db)
+
+    settings.storefront_draft = merge_dict(build_storefront_defaults(vendor, shop, products), payload or {})
     sync_legacy_marketplace_fields(settings, settings.storefront_draft)
     settings.updated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(settings)
-    
+
     return {
         "message": "Draft saved",
-        "settings": serialize_editor_state(settings, vendor, vendor.shop, vendor.products)
+        "settings": serialize_editor_state(settings, vendor, shop, products),
     }
 
 
@@ -1331,20 +1331,11 @@ async def publish_marketplace_settings(
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Publish the current storefront draft"""
     vendor = await get_vendor(current_user, db)
-    await db.refresh(vendor, attribute_names=["shop", "products"])
+    shop, products = await _load_vendor_context(vendor.id, db)
+    settings = await _get_or_create_settings(vendor.id, db)
 
-    result = await db.execute(
-        select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
-    )
-    settings = result.scalar_one_or_none()
-
-    if not settings:
-        settings = MarketplaceSettings(vendor_id=vendor.id)
-        db.add(settings)
-
-    settings.storefront_draft = settings.storefront_draft or build_storefront_defaults(vendor, vendor.shop, vendor.products)
+    settings.storefront_draft = settings.storefront_draft or build_storefront_defaults(vendor, shop, products)
     settings.storefront_published = settings.storefront_draft
     settings.storefront_status = "live"
     settings.published_at = datetime.utcnow()
@@ -1355,7 +1346,7 @@ async def publish_marketplace_settings(
 
     return {
         "message": "Storefront published successfully",
-        "settings": serialize_editor_state(settings, vendor, vendor.shop, vendor.products)
+        "settings": serialize_editor_state(settings, vendor, shop, products),
     }
 
 
@@ -1364,37 +1355,23 @@ async def reset_marketplace_settings(
     current_user: User = Depends(get_vendor_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Reset marketplace settings to default values"""
     vendor = await get_vendor(current_user, db)
-    await db.refresh(vendor, attribute_names=["shop", "products"])
-    
-    result = await db.execute(
-        select(MarketplaceSettings).where(MarketplaceSettings.vendor_id == vendor.id)
-    )
-    settings = result.scalar_one_or_none()
-    
-    if settings:
-        settings.theme = "default"
-        settings.storefront_draft = build_storefront_defaults(vendor, vendor.shop, vendor.products)
-        sync_legacy_marketplace_fields(settings, settings.storefront_draft)
-        settings.custom_css = None
-        settings.enable_reviews = True
-        settings.enable_wishlist = True
-        settings.enable_sharing = True
-        settings.meta_keywords = None
-        settings.updated_at = datetime.utcnow()
-        
-        await db.commit()
-        await db.refresh(settings)
-    else:
-        settings = MarketplaceSettings(vendor_id=vendor.id)
-        settings.storefront_draft = build_storefront_defaults(vendor, vendor.shop, vendor.products)
-        sync_legacy_marketplace_fields(settings, settings.storefront_draft)
-        db.add(settings)
-        await db.commit()
-        await db.refresh(settings)
-    
+    shop, products = await _load_vendor_context(vendor.id, db)
+    settings = await _get_or_create_settings(vendor.id, db)
+
+    settings.theme = "default"
+    settings.storefront_draft = build_storefront_defaults(vendor, shop, products)
+    sync_legacy_marketplace_fields(settings, settings.storefront_draft)
+    settings.custom_css = None
+    settings.enable_reviews = True
+    settings.enable_wishlist = True
+    settings.enable_sharing = True
+    settings.meta_keywords = None
+    settings.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(settings)
+
     return {
         "message": "Marketplace settings reset to default successfully",
-        "settings": serialize_editor_state(settings, vendor, vendor.shop, vendor.products)
+        "settings": serialize_editor_state(settings, vendor, shop, products),
     }
