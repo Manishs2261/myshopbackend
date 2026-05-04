@@ -48,7 +48,7 @@ def build_storefront_defaults(vendor: Vendor, shop: Shop | None, products: list[
             "fontFamily": "DM Sans",
         },
         "banner": {
-            "slidesCount": 3,
+            "slidesCount": 2,
             "slides": [
                 {
                     "tag": "New Arrivals",
@@ -63,14 +63,6 @@ def build_storefront_defaults(vendor: Vendor, shop: Shop | None, products: list[
                     "title": "Crafted by independent makers",
                     "subtext": "Discover small-batch products, warm materials, and thoughtful finishing details.",
                     "ctaLabel": "Explore Now",
-                    "ctaLink": "#recent-products",
-                    "imageUrl": "",
-                },
-                {
-                    "tag": "Limited Pieces",
-                    "title": "Fresh finds every week",
-                    "subtext": "Seasonal drops, featured favorites, and products chosen directly by the vendor.",
-                    "ctaLabel": "View Products",
                     "ctaLink": "#recent-products",
                     "imageUrl": "",
                 },
