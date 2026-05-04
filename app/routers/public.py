@@ -164,7 +164,7 @@ async def get_vendor_public_profile(vendor_id: int, db: AsyncSession = Depends(g
             select(Product)
             .where(
                 Product.vendor_id == vendor.id,
-                Product.status == "approved"
+                func.lower(Product.status) == "active"
             )
             .options(selectinload(Product.category), selectinload(Product.variants))
             .order_by(Product.created_at.desc())
@@ -329,7 +329,7 @@ async def get_vendor_marketplace_settings(vendor_id: int, db: AsyncSession = Dep
             select(Product)
             .where(
                 Product.vendor_id == vendor.id,
-                Product.status == "approved"
+                func.lower(Product.status) == "active"
             )
             .options(selectinload(Product.category))
         )
@@ -377,7 +377,7 @@ async def get_vendors_showcase(db: AsyncSession = Depends(get_db)):
                 select(Product)
                 .where(
                     Product.vendor_id == vendor.id,
-                    Product.status == "approved"
+                    func.lower(Product.status) == "active"
                 )
                 .options(selectinload(Product.category), selectinload(Product.variants))
                 .order_by(Product.created_at.desc())

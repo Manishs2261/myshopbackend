@@ -730,7 +730,7 @@ async def list_vendor_products(
 ):
     vendor = await get_vendor(current_user, db)
     latest_activity = func.coalesce(Product.updated_at, Product.created_at)
-    conditions = [Product.vendor_id == vendor.id]
+    conditions = [Product.vendor_id == vendor.id, Product.status != "deleted"]
 
     if search:
         term = f"%{search.strip()}%"
@@ -924,9 +924,57 @@ async def delete_product(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    product.status = "inactive"
+    product.status = "deleted"
+    product.updated_at = datetime.utcnow()
     await db.commit()
-    return {"message": "Product deactivated"}
+    return {"message": "Product deleted"}
+
+
+@router.post("/products/bulk-delete", response_model=dict)
+async def bulk_delete_products(
+    payload: dict = Body(...),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+    ids = [int(i) for i in (payload.get("ids") or [])]
+    if not ids:
+        raise HTTPException(status_code=400, detail="No product IDs provided")
+    result = await db.execute(
+        select(Product).where(Product.id.in_(ids), Product.vendor_id == vendor.id)
+    )
+    products = result.scalars().all()
+    now = datetime.utcnow()
+    for p in products:
+        p.status = "deleted"
+        p.updated_at = now
+    await db.commit()
+    return {"message": f"{len(products)} products deleted", "deleted": len(products)}
+
+
+@router.post("/products/bulk-status", response_model=dict)
+async def bulk_update_product_status(
+    payload: dict = Body(...),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+    ids = [int(i) for i in (payload.get("ids") or [])]
+    status = str(payload.get("status") or "").lower()
+    if not ids:
+        raise HTTPException(status_code=400, detail="No product IDs provided")
+    if status not in ("active", "inactive"):
+        raise HTTPException(status_code=400, detail="Status must be 'active' or 'inactive'")
+    result = await db.execute(
+        select(Product).where(Product.id.in_(ids), Product.vendor_id == vendor.id)
+    )
+    products = result.scalars().all()
+    now = datetime.utcnow()
+    for p in products:
+        p.status = status
+        p.updated_at = now
+    await db.commit()
+    return {"message": f"{len(products)} products updated to {status}", "updated": len(products)}
 
 
 # ─── Orders ─────────────────────────────────────────────────────────────────
