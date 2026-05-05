@@ -10,14 +10,15 @@ from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.storage import upload_product_image, delete_product_images, supabase_storage_enabled, StorageUploadError
 from app.core.security import require_role
-from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings
+from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings, VendorFeedback
 from app.schemas.schemas import (
     VendorCreate, VendorUpdate, VendorResponse,
     ShopCreate, ShopUpdate, ShopResponse,
     ProductCreate, ProductUpdate, ProductResponse,
     OrderResponse, OrderStatusUpdate, PaginatedResponse,
     PayoutRequest, PayoutResponse, VendorDashboard, VendorDashboardOverview, VendorAnalyticsOverview,
-    MarketplaceSettingsUpdate, MarketplaceSettingsResponse
+    MarketplaceSettingsUpdate, MarketplaceSettingsResponse,
+    FeedbackCreate, FeedbackResponse
 )
 from slugify import slugify
 import math
@@ -1421,3 +1422,98 @@ async def reset_marketplace_settings(
         "message": "Marketplace settings reset to default successfully",
         "settings": serialize_editor_state(settings, vendor, shop, products),
     }
+
+
+# ─── Help & Feedback ─────────────────────────────────────────────────────────
+
+VALID_FEEDBACK_TYPES = {"feedback", "bug_report", "feature_request", "general"}
+VALID_FEEDBACK_PRIORITIES = {"low", "medium", "high"}
+
+
+@router.post("/help/feedback", response_model=FeedbackResponse, status_code=201)
+async def submit_feedback(
+    payload: FeedbackCreate,
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Vendor).where(Vendor.user_id == current_user.id))
+    vendor = result.scalar_one_or_none()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor profile not found")
+
+    if payload.type not in VALID_FEEDBACK_TYPES:
+        raise HTTPException(status_code=422, detail=f"Invalid type. Must be one of: {', '.join(VALID_FEEDBACK_TYPES)}")
+    if payload.priority not in VALID_FEEDBACK_PRIORITIES:
+        raise HTTPException(status_code=422, detail=f"Invalid priority. Must be one of: {', '.join(VALID_FEEDBACK_PRIORITIES)}")
+
+    feedback = VendorFeedback(
+        vendor_id=vendor.id,
+        type=payload.type,
+        subject=payload.subject,
+        description=payload.description,
+        priority=payload.priority,
+        attachments=payload.attachments,
+    )
+    db.add(feedback)
+    await db.commit()
+    await db.refresh(feedback)
+    return FeedbackResponse.model_validate(feedback)
+
+
+@router.get("/help/feedback", response_model=PaginatedResponse)
+async def list_my_feedback(
+    type: str = None,
+    status: str = None,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Vendor).where(Vendor.user_id == current_user.id))
+    vendor = result.scalar_one_or_none()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor profile not found")
+
+    query = select(VendorFeedback).where(VendorFeedback.vendor_id == vendor.id)
+    if type:
+        query = query.where(VendorFeedback.type == type)
+    if status:
+        query = query.where(VendorFeedback.status == status)
+    query = query.order_by(VendorFeedback.created_at.desc())
+
+    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = count_result.scalar()
+
+    offset = (page - 1) * limit
+    rows = await db.execute(query.offset(offset).limit(limit))
+    items = rows.scalars().all()
+
+    return PaginatedResponse(
+        items=[FeedbackResponse.model_validate(f) for f in items],
+        total=total, page=page, limit=limit,
+        pages=math.ceil(total / limit) if total else 1,
+    )
+
+
+@router.get("/help/feedback/{feedback_id}", response_model=FeedbackResponse)
+async def get_feedback_detail(
+    feedback_id: int,
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Vendor).where(Vendor.user_id == current_user.id))
+    vendor = result.scalar_one_or_none()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor profile not found")
+
+    fb_result = await db.execute(
+        select(VendorFeedback).where(
+            VendorFeedback.id == feedback_id,
+            VendorFeedback.vendor_id == vendor.id,
+        )
+    )
+    feedback = fb_result.scalar_one_or_none()
+    if not feedback:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+
+    return FeedbackResponse.model_validate(feedback)

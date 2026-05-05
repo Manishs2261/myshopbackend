@@ -611,6 +611,40 @@ class CouponValidate(BaseModel):
     order_amount: Decimal
 
 
+# ─── Help & Feedback ────────────────────────────────────────────────────────
+
+class FeedbackCreate(BaseModel):
+    type: str = "general"
+    subject: str = Field(..., min_length=5, max_length=300)
+    description: str = Field(..., min_length=10)
+    priority: str = "medium"
+    attachments: Optional[List[str]] = None
+
+
+class FeedbackResponse(BaseModel):
+    id: int
+    vendor_id: int
+    type: str
+    subject: str
+    description: str
+    status: str
+    priority: str
+    attachments: Optional[List[str]]
+    admin_response: Optional[str]
+    admin_response_at: Optional[datetime]
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class AdminFeedbackUpdate(BaseModel):
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    admin_response: Optional[str] = None
+
+
 # ─── Events ─────────────────────────────────────────────────────────────────
 
 class EventData(BaseModel):

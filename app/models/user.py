@@ -78,6 +78,26 @@ class PageTheme(str, enum.Enum):
     COLORFUL = "colorful"
 
 
+class FeedbackType(str, enum.Enum):
+    FEEDBACK = "feedback"
+    BUG_REPORT = "bug_report"
+    FEATURE_REQUEST = "feature_request"
+    GENERAL = "general"
+
+
+class FeedbackStatus(str, enum.Enum):
+    OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+
+class FeedbackPriority(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 # ─── Models ────────────────────────────────────────────────────────────────
 
 class User(Base):
@@ -131,6 +151,7 @@ class Vendor(Base):
     products = relationship("Product", back_populates="vendor")
     payouts = relationship("Payout", back_populates="vendor")
     marketplace_settings = relationship("MarketplaceSettings", back_populates="vendor", uselist=False)
+    feedbacks = relationship("VendorFeedback", back_populates="vendor")
 
 
 class Shop(Base):
@@ -444,3 +465,22 @@ class MarketplaceSettings(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     vendor = relationship("Vendor", back_populates="marketplace_settings")
+
+
+class VendorFeedback(Base):
+    __tablename__ = "vendor_feedbacks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False, index=True)
+    type = Column(String(30), default=FeedbackType.GENERAL, nullable=False)
+    subject = Column(String(300), nullable=False)
+    description = Column(Text, nullable=False)
+    status = Column(String(20), default=FeedbackStatus.OPEN)
+    priority = Column(String(20), default=FeedbackPriority.MEDIUM)
+    attachments = Column(JSON, nullable=True)
+    admin_response = Column(Text, nullable=True)
+    admin_response_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    vendor = relationship("Vendor", back_populates="feedbacks")

@@ -6,12 +6,13 @@ from app.core.database import get_db
 from app.core.security import require_role
 from app.models.user import (
     User, Vendor, Shop, Product, Order, OrderItem,
-    Category, Coupon, Payout, Event
+    Category, Coupon, Payout, Event, VendorFeedback
 )
 from app.schemas.schemas import (
     UserResponse, VendorResponse, ProductResponse, CategoryCreate,
     CategoryUpdate, CategoryResponse, CouponCreate, CouponUpdate,
-    CouponResponse, AdminAnalytics, PaginatedResponse, PayoutResponse
+    CouponResponse, AdminAnalytics, PaginatedResponse, PayoutResponse,
+    FeedbackResponse, AdminFeedbackUpdate
 )
 from slugify import slugify
 import math
@@ -442,3 +443,95 @@ async def process_payout(
     await db.commit()
     await db.refresh(payout)
     return payout
+
+
+# ─── Help & Feedback Management ──────────────────────────────────────────────
+
+VALID_FEEDBACK_STATUSES = {"open", "in_progress", "resolved", "closed"}
+VALID_FEEDBACK_PRIORITIES = {"low", "medium", "high"}
+
+
+@router.get("/feedback", response_model=PaginatedResponse)
+async def list_all_feedback(
+    type: str = None,
+    status: str = None,
+    priority: str = None,
+    vendor_id: int = None,
+    search: str = None,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(VendorFeedback)
+    if type:
+        query = query.where(VendorFeedback.type == type)
+    if status:
+        query = query.where(VendorFeedback.status == status)
+    if priority:
+        query = query.where(VendorFeedback.priority == priority)
+    if vendor_id:
+        query = query.where(VendorFeedback.vendor_id == vendor_id)
+    if search:
+        query = query.where(
+            VendorFeedback.subject.ilike(f"%{search}%") |
+            VendorFeedback.description.ilike(f"%{search}%")
+        )
+    query = query.order_by(VendorFeedback.created_at.desc())
+
+    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = count_result.scalar()
+
+    offset = (page - 1) * limit
+    rows = await db.execute(query.offset(offset).limit(limit))
+    items = rows.scalars().all()
+
+    return PaginatedResponse(
+        items=[FeedbackResponse.model_validate(f) for f in items],
+        total=total, page=page, limit=limit,
+        pages=math.ceil(total / limit) if total else 1,
+    )
+
+
+@router.get("/feedback/{feedback_id}", response_model=FeedbackResponse)
+async def get_feedback(
+    feedback_id: int,
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(VendorFeedback).where(VendorFeedback.id == feedback_id))
+    feedback = result.scalar_one_or_none()
+    if not feedback:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    return FeedbackResponse.model_validate(feedback)
+
+
+@router.put("/feedback/{feedback_id}", response_model=FeedbackResponse)
+async def update_feedback(
+    feedback_id: int,
+    payload: AdminFeedbackUpdate,
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(VendorFeedback).where(VendorFeedback.id == feedback_id))
+    feedback = result.scalar_one_or_none()
+    if not feedback:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+
+    if payload.status is not None:
+        if payload.status not in VALID_FEEDBACK_STATUSES:
+            raise HTTPException(status_code=422, detail=f"Invalid status. Must be one of: {', '.join(VALID_FEEDBACK_STATUSES)}")
+        feedback.status = payload.status
+
+    if payload.priority is not None:
+        if payload.priority not in VALID_FEEDBACK_PRIORITIES:
+            raise HTTPException(status_code=422, detail=f"Invalid priority. Must be one of: {', '.join(VALID_FEEDBACK_PRIORITIES)}")
+        feedback.priority = payload.priority
+
+    if payload.admin_response is not None:
+        feedback.admin_response = payload.admin_response
+        feedback.admin_response_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(feedback)
+    return FeedbackResponse.model_validate(feedback)
