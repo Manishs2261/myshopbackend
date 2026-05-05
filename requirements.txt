@@ -1,19 +1,36 @@
+# ── Web Framework ─────────────────────────────────────────────
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+starlette==0.37.2
+
+# ── Database ──────────────────────────────────────────────────
 sqlalchemy==2.0.30
 asyncpg==0.29.0
+psycopg2-binary==2.9.9
 alembic==1.13.1
+greenlet==3.0.3
+
+# ── Auth & Security ───────────────────────────────────────────
 pydantic==2.7.1
 pydantic-settings==2.2.1
+email-validator==2.1.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.9
+
+# ── Storage & Media ───────────────────────────────────────────
+aiofiles==23.2.1
+Pillow==10.3.0
+httpx==0.27.0
+
+# ── External Services ─────────────────────────────────────────
 firebase-admin==6.5.0
 razorpay==1.4.1
-httpx==0.27.0
 redis==5.0.4
-Pillow==10.3.0
+
+# ── Utilities ─────────────────────────────────────────────────
 python-slugify==8.0.4
-aiofiles==23.2.1
-psycopg2-binary==2.9.9
-greenlet==3.0.3
+
+# ── Testing & Dev ─────────────────────────────────────────────
+requests==2.31.0
+aiohttp==3.9.1
