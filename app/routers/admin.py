@@ -166,8 +166,6 @@ async def list_products_admin(
     query = select(Product)
     if status:
         query = query.where(Product.status == status)
-    else:
-        query = query.where(Product.status == "pending")
     query = query.order_by(Product.created_at.desc())
 
     count_result = await db.execute(select(func.count()).select_from(query.subquery()))
