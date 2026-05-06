@@ -467,6 +467,85 @@ class MarketplaceSettings(Base):
     vendor = relationship("Vendor", back_populates="marketplace_settings")
 
 
+class WebsiteSettings(Base):
+    __tablename__ = "website_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # General
+    site_name = Column(String, default="LocalShop")
+    tagline = Column(String, default="Your Local Shopping Destination")
+    contact_email = Column(String, default="admin@localshop.in")
+    contact_phone = Column(String, default="+91 9800000000")
+    address = Column(Text, nullable=True)
+    timezone = Column(String, default="Asia/Kolkata")
+    currency = Column(String, default="INR")
+
+    # Appearance
+    logo_url = Column(String, nullable=True)
+    favicon_url = Column(String, nullable=True)
+    primary_color = Column(String, default="#6c5ce7")
+    accent_color = Column(String, default="#00cec9")
+    theme_mode = Column(String, default="Dark")
+    font_family = Column(String, default="DM Sans")
+
+    # SEO
+    seo_meta_title = Column(String, nullable=True)
+    seo_meta_description = Column(Text, nullable=True)
+    seo_meta_keywords = Column(String, nullable=True)
+    seo_og_image_url = Column(String, nullable=True)
+    seo_canonical_url = Column(String, nullable=True)
+
+    # Shipping
+    shipping_free_above = Column(Float, default=499.0)
+    shipping_standard_rate = Column(Float, default=49.0)
+    shipping_express_rate = Column(Float, default=99.0)
+    shipping_estimated_days = Column(Integer, default=3)
+    shipping_policy = Column(Text, nullable=True)
+
+    # Payments
+    payment_commission_pct = Column(Float, default=10.0)
+    payment_min_payout = Column(Float, default=500.0)
+    payment_razorpay_enabled = Column(Boolean, default=True)
+    payment_cod_enabled = Column(Boolean, default=True)
+    payment_razorpay_key_id = Column(String, nullable=True)
+    payment_razorpay_key_secret = Column(String, nullable=True)
+
+    # Email / SMTP
+    smtp_host = Column(String, default="smtp.gmail.com")
+    smtp_port = Column(Integer, default=587)
+    smtp_username = Column(String, nullable=True)
+    smtp_password = Column(String, nullable=True)
+    smtp_from_name = Column(String, default="LocalShop")
+    smtp_from_email = Column(String, default="noreply@localshop.in")
+    smtp_encryption = Column(String, default="TLS")
+
+    # Social Links
+    social_facebook = Column(String, nullable=True)
+    social_instagram = Column(String, nullable=True)
+    social_twitter = Column(String, nullable=True)
+    social_youtube = Column(String, nullable=True)
+    social_linkedin = Column(String, nullable=True)
+
+    # Maintenance
+    maintenance_enabled = Column(Boolean, default=False)
+    maintenance_message = Column(Text, default="We're improving your experience. We'll be back shortly!")
+    maintenance_allowed_ips = Column(String, nullable=True)
+    maintenance_estimated_downtime = Column(String, nullable=True)
+
+    # Complex JSON sections
+    banner_slides = Column(JSON, nullable=True)
+    promo_sections = Column(JSON, nullable=True)
+    blog_posts = Column(JSON, nullable=True)
+    blog_view_all_url = Column(String, default="/blog")
+    blog_section_visible = Column(Boolean, default=True)
+    top_navigation = Column(JSON, nullable=True)
+    browse_categories = Column(JSON, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class VendorFeedback(Base):
     __tablename__ = "vendor_feedbacks"
 

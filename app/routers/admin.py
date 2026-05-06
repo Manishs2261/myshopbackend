@@ -6,13 +6,14 @@ from app.core.database import get_db
 from app.core.security import require_role
 from app.models.user import (
     User, Vendor, Shop, Product, Order, OrderItem,
-    Category, Coupon, Payout, Event, VendorFeedback
+    Category, Coupon, Payout, Event, VendorFeedback, WebsiteSettings
 )
 from app.schemas.schemas import (
     UserResponse, VendorResponse, ProductResponse, CategoryCreate,
     CategoryUpdate, CategoryResponse, CouponCreate, CouponUpdate,
     CouponResponse, AdminAnalytics, PaginatedResponse, PayoutResponse,
-    FeedbackResponse, AdminFeedbackUpdate
+    FeedbackResponse, AdminFeedbackUpdate,
+    WebsiteSettingsUpdate, WebsiteSettingsResponse
 )
 from slugify import slugify
 import math
@@ -535,3 +536,39 @@ async def update_feedback(
     await db.commit()
     await db.refresh(feedback)
     return FeedbackResponse.model_validate(feedback)
+
+
+# ─── Website Settings ─────────────────────────────────────────────────────────
+
+async def _get_or_create_website_settings(db: AsyncSession) -> WebsiteSettings:
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return settings
+
+
+@router.get("/website-settings", response_model=WebsiteSettingsResponse)
+async def get_website_settings(
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    settings = await _get_or_create_website_settings(db)
+    return WebsiteSettingsResponse.model_validate(settings)
+
+
+@router.put("/website-settings", response_model=WebsiteSettingsResponse)
+async def update_website_settings(
+    payload: WebsiteSettingsUpdate,
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    settings = await _get_or_create_website_settings(db)
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(settings, field, value)
+    await db.commit()
+    await db.refresh(settings)
+    return WebsiteSettingsResponse.model_validate(settings)

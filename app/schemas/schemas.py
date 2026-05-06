@@ -294,6 +294,80 @@ class MarketplaceSettingsResponse(MarketplaceSettingsBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+# ─── Website Settings ────────────────────────────────────────────────────────
+
+class WebsiteSettingsUpdate(BaseModel):
+    # General
+    site_name: Optional[str] = None
+    tagline: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    address: Optional[str] = None
+    timezone: Optional[str] = None
+    currency: Optional[str] = None
+    # Appearance
+    logo_url: Optional[str] = None
+    favicon_url: Optional[str] = None
+    primary_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    theme_mode: Optional[str] = None
+    font_family: Optional[str] = None
+    # SEO
+    seo_meta_title: Optional[str] = None
+    seo_meta_description: Optional[str] = None
+    seo_meta_keywords: Optional[str] = None
+    seo_og_image_url: Optional[str] = None
+    seo_canonical_url: Optional[str] = None
+    # Shipping
+    shipping_free_above: Optional[float] = None
+    shipping_standard_rate: Optional[float] = None
+    shipping_express_rate: Optional[float] = None
+    shipping_estimated_days: Optional[int] = None
+    shipping_policy: Optional[str] = None
+    # Payments
+    payment_commission_pct: Optional[float] = None
+    payment_min_payout: Optional[float] = None
+    payment_razorpay_enabled: Optional[bool] = None
+    payment_cod_enabled: Optional[bool] = None
+    payment_razorpay_key_id: Optional[str] = None
+    payment_razorpay_key_secret: Optional[str] = None
+    # Email / SMTP
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = None
+    smtp_username: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_from_name: Optional[str] = None
+    smtp_from_email: Optional[str] = None
+    smtp_encryption: Optional[str] = None
+    # Social
+    social_facebook: Optional[str] = None
+    social_instagram: Optional[str] = None
+    social_twitter: Optional[str] = None
+    social_youtube: Optional[str] = None
+    social_linkedin: Optional[str] = None
+    # Maintenance
+    maintenance_enabled: Optional[bool] = None
+    maintenance_message: Optional[str] = None
+    maintenance_allowed_ips: Optional[str] = None
+    maintenance_estimated_downtime: Optional[str] = None
+    # JSON sections
+    banner_slides: Optional[List[Any]] = None
+    promo_sections: Optional[List[Any]] = None
+    blog_posts: Optional[List[Any]] = None
+    blog_view_all_url: Optional[str] = None
+    blog_section_visible: Optional[bool] = None
+    top_navigation: Optional[List[Any]] = None
+    browse_categories: Optional[List[Any]] = None
+
+
+class WebsiteSettingsResponse(WebsiteSettingsUpdate):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ─── Category ───────────────────────────────────────────────────────────────
 
 class CategoryCreate(BaseModel):
