@@ -33,6 +33,18 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8080"
 
+    # Mail Settings
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM: str = "noreply@localshop.com"
+    MAIL_PORT: int = 587
+    MAIL_SERVER: str = "smtp.gmail.com"
+    MAIL_FROM_NAME: str = "LocalShop"
+    MAIL_STARTTLS: bool = True
+    MAIL_SSL_TLS: bool = False
+    USE_CREDENTIALS: bool = True
+    VALIDATE_CERTS: bool = True
+
     @field_validator("DEBUG", mode="before")
     @classmethod
     def parse_debug(cls, value):

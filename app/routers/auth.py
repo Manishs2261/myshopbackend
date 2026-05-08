@@ -48,6 +48,7 @@ from app.schemas.schemas import (
     ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest,
     UserResponse,
 )
+from app.services.mail import mail_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -97,11 +98,7 @@ async def send_otp_sms(phone: str, otp: str):
 
 
 async def send_reset_email(email: str, token: str):
-    """
-    Replace with SendGrid, Mailgun, AWS SES, Resend, etc.
-    """
-    reset_url = f"https://yourdomain.com/reset-password?token={token}"
-    print(f"[EMAIL] Reset link for {email}: {reset_url}")
+    await mail_service.send_password_reset_email(email, token)
 
 
 # ─── CUSTOMER Registration & Login ───────────────────────────────────────────
@@ -634,8 +631,8 @@ async def send_email_verification_otp(
     current_user.otp_code = otp
     current_user.otp_expires_at = expires
     await db.commit()
-    background_tasks.add_task(send_reset_email, current_user.email, otp)
-    return {"message": f"OTP sent to {current_user.email}", "expires_in_seconds": 600, "__dev_otp": otp}
+    background_tasks.add_task(mail_service.send_otp_email, current_user.email, otp)
+    return {"message": f"OTP sent to {current_user.email}", "expires_in_seconds": 600}
 
 
 @router.post("/verify/email/confirm", response_model=dict)
@@ -647,8 +644,18 @@ async def confirm_email_verification(
     otp = payload.get("otp", "")
     if not current_user.otp_code:
         raise HTTPException(status_code=400, detail="No OTP found. Request a new one.")
-    if datetime.utcnow() > current_user.otp_expires_at:
-        raise HTTPException(status_code=400, detail="OTP expired. Request a new one.")
+
+    # Check expiry
+    if current_user.otp_expires_at:
+        expires = current_user.otp_expires_at
+        if hasattr(expires, 'tzinfo') and expires.tzinfo:
+            from datetime import timezone
+            now = datetime.now(timezone.utc)
+        else:
+            now = datetime.utcnow()
+        if now > expires:
+            raise HTTPException(status_code=400, detail="OTP expired. Request a new one.")
+
     if current_user.otp_code != otp:
         raise HTTPException(status_code=400, detail="Invalid OTP")
     current_user.is_email_verified = True
