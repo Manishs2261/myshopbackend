@@ -12,6 +12,10 @@ class FirebaseLoginRequest(BaseModel):
     role: Optional[str] = "USER"  # USER or VENDOR
 
 
+class FirebaseVerifyPhoneRequest(BaseModel):
+    firebase_token: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
@@ -110,6 +114,10 @@ class SendOTPRequest(BaseModel):
         if not re.match(r"^[6-9]\d{9}$", cleaned):
             raise ValueError("Enter a valid 10-digit Indian mobile number")
         return cleaned
+
+
+class SendEmailOTPRequest(BaseModel):
+    email: Optional[EmailStr] = None
 
 
 class VerifyOTPRequest(BaseModel):

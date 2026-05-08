@@ -27,6 +27,7 @@ SHARED:
 import secrets
 import random
 from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from passlib.context import CryptContext
@@ -44,7 +45,7 @@ from app.schemas.schemas import (
     FirebaseLoginRequest, TokenResponse, RefreshTokenRequest,
     CustomerRegisterRequest, CustomerLoginRequest,
     VendorRegisterRequest, VendorLoginRequest,
-    SendOTPRequest, VerifyOTPRequest,
+    SendOTPRequest, SendEmailOTPRequest, VerifyOTPRequest, FirebaseVerifyPhoneRequest,
     ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest,
     UserResponse,
 )
@@ -620,19 +621,27 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 @router.post("/verify/email/send", response_model=dict)
 async def send_email_verification_otp(
-    background_tasks: BackgroundTasks,
+    payload: Optional[SendEmailOTPRequest] = None,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if not current_user.email:
-        raise HTTPException(status_code=400, detail="No email address on account")
+    target_email = payload.email if payload and payload.email else current_user.email
+    
+    if not target_email:
+        raise HTTPException(status_code=400, detail="No email address provided")
+        
     otp = generate_otp(6)
     expires = datetime.utcnow() + timedelta(minutes=10)
     current_user.otp_code = otp
     current_user.otp_expires_at = expires
+    # Temporarily store the email being verified if it's different
+    if payload and payload.email:
+        current_user.unverified_email = payload.email
+        
     await db.commit()
-    background_tasks.add_task(mail_service.send_otp_email, current_user.email, otp)
-    return {"message": f"OTP sent to {current_user.email}", "expires_in_seconds": 600}
+    background_tasks.add_task(mail_service.send_otp_email, target_email, otp)
+    return {"message": f"OTP sent to {target_email}", "expires_in_seconds": 600}
 
 
 @router.post("/verify/email/confirm", response_model=dict)
@@ -658,6 +667,12 @@ async def confirm_email_verification(
 
     if current_user.otp_code != otp:
         raise HTTPException(status_code=400, detail="Invalid OTP")
+        
+    # If a new email was being verified, update it
+    if hasattr(current_user, 'unverified_email') and current_user.unverified_email:
+        current_user.email = current_user.unverified_email
+        current_user.unverified_email = None
+
     current_user.is_email_verified = True
     current_user.otp_code = None
     current_user.otp_expires_at = None
@@ -700,3 +715,29 @@ async def confirm_phone_verification(
     current_user.otp_expires_at = None
     await db.commit()
     return {"message": "Phone verified successfully"}
+
+
+@router.post("/verify/phone/firebase", response_model=dict)
+async def verify_phone_with_firebase(
+    payload: FirebaseVerifyPhoneRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Verify phone number using a Firebase ID token.
+    The client should have already verified the phone via Firebase SDK.
+    """
+    firebase_data = verify_firebase_token(payload.firebase_token)
+    phone_number = firebase_data.get("phone_number")
+
+    if not phone_number:
+        raise HTTPException(
+            status_code=400, 
+            detail="Firebase token does not contain a verified phone number. Make sure you use Phone Auth in Firebase."
+        )
+
+    current_user.phone = phone_number
+    current_user.is_phone_verified = True
+    await db.commit()
+
+    return {"message": "Phone number verified successfully via Firebase", "phone": phone_number}

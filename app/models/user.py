@@ -109,6 +109,7 @@ class User(Base):
     email = Column(String(200), unique=True, index=True, nullable=True)
     phone = Column(String(20), unique=True, index=True, nullable=True)
     hashed_password = Column(String(256), nullable=True)          # for email/password auth
+    unverified_email = Column(String(200), nullable=True)         # temporarily store email during verification
     otp_code = Column(String(10), nullable=True)                  # for phone OTP
     otp_expires_at = Column(DateTime(timezone=True), nullable=True)
     password_reset_token = Column(String(200), nullable=True)
