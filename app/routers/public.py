@@ -163,7 +163,7 @@ async def get_public_products(
 ):
     base_query = (
         select(Product)
-        .where(func.lower(Product.status) == "active")
+        .where(func.lower(Product.status) == "approved")
         .options(selectinload(Product.category), selectinload(Product.variants))
     )
 
@@ -290,6 +290,99 @@ async def get_public_products(
     }
 
 
+@router.get("/products/{product_id}/related")
+async def get_related_products(product_id: int, limit: int = 6, db: AsyncSession = Depends(get_db)):
+    # Get current product's category
+    cur = await db.execute(select(Product.category_id).where(Product.id == product_id))
+    category_id = cur.scalar_one_or_none()
+
+    query = (
+        select(Product)
+        .where(func.lower(Product.status) == "approved")
+        .where(Product.id != product_id)
+        .options(selectinload(Product.category), selectinload(Product.variants))
+        .order_by(Product.rating.desc())
+        .limit(limit)
+    )
+    if category_id:
+        query = query.where(Product.category_id == category_id)
+
+    result = await db.execute(query)
+    products = result.scalars().all()
+
+    related = []
+    for p in products:
+        discounted_price = float(p.price)
+        if p.discount_percentage and p.discount_percentage > 0:
+            discounted_price = round(float(p.price) * (1 - p.discount_percentage / 100), 2)
+        related.append({
+            "id": p.id, "name": p.name, "slug": p.slug, "brand": p.brand or "",
+            "price": float(p.price),
+            "original_price": float(p.original_price) if p.original_price else None,
+            "discount_percentage": p.discount_percentage,
+            "discounted_price": discounted_price,
+            "images": p.images or [],
+            "category_name": p.category.name if p.category else "Uncategorized",
+            "rating": p.rating or 0, "review_count": p.review_count or 0,
+            "stock": p.stock, "in_stock": (p.stock or 0) > 0,
+        })
+    return related
+
+
+@router.get("/products/{product_id}")
+async def get_public_product_by_id(product_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Product)
+        .where(Product.id == product_id)
+        .where(func.lower(Product.status) == "approved")
+        .options(selectinload(Product.category), selectinload(Product.variants))
+    )
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    discounted_price = float(product.price)
+    if product.discount_percentage and product.discount_percentage > 0:
+        discounted_price = round(float(product.price) * (1 - product.discount_percentage / 100), 2)
+
+    return {
+        "id": product.id,
+        "name": product.name,
+        "slug": product.slug,
+        "brand": product.brand or "",
+        "description": product.description or "",
+        "price": float(product.price),
+        "original_price": float(product.original_price) if product.original_price else None,
+        "discount_percentage": product.discount_percentage,
+        "discounted_price": discounted_price,
+        "images": product.images or [],
+        "tags": product.tags or [],
+        "specifications": product.specifications or {},
+        "unit": product.unit or "",
+        "category_id": product.category_id,
+        "category_name": product.category.name if product.category else "Uncategorized",
+        "category_slug": product.category.slug if product.category else None,
+        "rating": product.rating or 0,
+        "review_count": product.review_count or 0,
+        "stock": product.stock,
+        "in_stock": (product.stock or 0) > 0,
+        "is_featured": product.is_featured or False,
+        "variants": [
+            {
+                "id": v.id,
+                "size": v.size,
+                "color": v.color,
+                "sku": v.sku,
+                "price": float(v.price) if v.price else None,
+                "stock": v.stock,
+                "images": v.images or [],
+            }
+            for v in product.variants
+        ],
+        "created_at": product.created_at.isoformat() if product.created_at else None,
+    }
+
+
 @router.get("/test")
 async def test_endpoint():
     """Simple test endpoint to verify the router is working"""
@@ -345,7 +438,7 @@ async def get_vendor_public_profile(vendor_id: int, db: AsyncSession = Depends(g
             select(Product)
             .where(
                 Product.vendor_id == vendor.id,
-                func.lower(Product.status) == "active"
+                func.lower(Product.status) == "approved"
             )
             .options(selectinload(Product.category), selectinload(Product.variants))
             .order_by(Product.created_at.desc())
@@ -510,7 +603,7 @@ async def get_vendor_marketplace_settings(vendor_id: int, db: AsyncSession = Dep
             select(Product)
             .where(
                 Product.vendor_id == vendor.id,
-                func.lower(Product.status) == "active"
+                func.lower(Product.status) == "approved"
             )
             .options(selectinload(Product.category))
         )
@@ -558,7 +651,7 @@ async def get_vendors_showcase(db: AsyncSession = Depends(get_db)):
                 select(Product)
                 .where(
                     Product.vendor_id == vendor.id,
-                    func.lower(Product.status) == "active"
+                    func.lower(Product.status) == "approved"
                 )
                 .options(selectinload(Product.category), selectinload(Product.variants))
                 .order_by(Product.created_at.desc())
