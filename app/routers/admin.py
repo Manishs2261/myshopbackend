@@ -217,6 +217,153 @@ async def reject_product(
     return {"message": "Product rejected", "product_id": product_id, "reason": reason}
 
 
+@router.delete("/products/{product_id}", response_model=dict)
+async def delete_product(
+    product_id: int,
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    await db.delete(product)
+    await db.commit()
+    return {"message": "Product deleted", "product_id": product_id}
+
+
+@router.put("/products/{product_id}/feature", response_model=dict)
+async def feature_product(
+    product_id: int,
+    payload: dict,
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    product.is_featured = bool(payload.get("is_featured", False))
+    await db.commit()
+    return {"message": "Product updated", "product_id": product_id, "is_featured": product.is_featured}
+
+
+@router.post("/products", response_model=ProductResponse, status_code=201)
+async def admin_create_product(
+    payload: dict,
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin creates a product directly (JSON body, images as URL list, auto-approved)."""
+    name = (payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Product name is required")
+    price = payload.get("price")
+    if price is None:
+        raise HTTPException(status_code=400, detail="Price is required")
+    category_id = payload.get("category_id")
+    if not category_id:
+        raise HTTPException(status_code=400, detail="Category is required")
+    vendor_id = payload.get("vendor_id")
+    if not vendor_id:
+        raise HTTPException(status_code=400, detail="Vendor is required")
+
+    # Verify vendor exists
+    vr = await db.execute(select(Vendor).where(Vendor.id == int(vendor_id)))
+    if not vr.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    # Generate unique slug
+    from slugify import slugify as _sl
+    base = _sl(name)
+    slug = base
+    i = 1
+    while (await db.execute(select(Product.id).where(Product.slug == slug))).scalar_one_or_none():
+        slug = f"{base}-{i}"; i += 1
+
+    tags = payload.get("tags", [])
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split(",") if t.strip()]
+
+    images = payload.get("images", [])
+    if isinstance(images, str):
+        images = [u.strip() for u in images.split("\n") if u.strip()]
+
+    product = Product(
+        vendor_id=int(vendor_id),
+        category_id=int(category_id),
+        name=name,
+        slug=slug,
+        description=payload.get("description"),
+        brand=payload.get("brand"),
+        price=float(price),
+        original_price=float(payload["original_price"]) if payload.get("original_price") else None,
+        discount_percentage=int(payload["discount_percentage"]) if payload.get("discount_percentage") else None,
+        stock=int(payload.get("stock") or 0),
+        unit=payload.get("unit"),
+        status=payload.get("status", "approved"),
+        is_featured=bool(payload.get("is_featured", False)),
+        images=images,
+        tags=tags,
+        specifications=payload.get("specifications") or {},
+    )
+    db.add(product)
+    await db.commit()
+    result = await db.execute(
+        select(Product).where(Product.id == product.id)
+        .options(selectinload(Product.variants), selectinload(Product.category))
+    )
+    return ProductResponse.model_validate(result.scalar_one())
+
+
+@router.put("/products/{product_id}", response_model=ProductResponse)
+async def admin_update_product(
+    product_id: int,
+    payload: dict,
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    updatable = ["name", "description", "brand", "price", "original_price",
+                 "discount_percentage", "stock", "unit", "status", "is_featured",
+                 "images", "tags", "specifications", "category_id"]
+    for field in updatable:
+        if field in payload:
+            val = payload[field]
+            if field in ("price", "original_price") and val is not None:
+                val = float(val)
+            elif field in ("discount_percentage", "stock", "category_id") and val is not None:
+                val = int(val)
+            elif field == "tags" and isinstance(val, str):
+                val = [t.strip() for t in val.split(",") if t.strip()]
+            elif field == "images" and isinstance(val, str):
+                val = [u.strip() for u in val.split("\n") if u.strip()]
+            setattr(product, field, val)
+
+    await db.commit()
+    result = await db.execute(
+        select(Product).where(Product.id == product_id)
+        .options(selectinload(Product.variants), selectinload(Product.category))
+    )
+    return ProductResponse.model_validate(result.scalar_one())
+
+
+@router.get("/vendors/list", response_model=list[dict])
+async def admin_list_vendors_simple(
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lightweight vendor list for dropdowns."""
+    result = await db.execute(
+        select(Vendor.id, Vendor.business_name).where(Vendor.status == "approved").order_by(Vendor.business_name)
+    )
+    return [{"id": r.id, "business_name": r.business_name} for r in result.all()]
+
+
 # ─── Categories ──────────────────────────────────────────────────────────────
 
 @router.get("/categories", response_model=list[CategoryResponse])
