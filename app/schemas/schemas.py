@@ -376,6 +376,21 @@ class WebsiteSettingsResponse(WebsiteSettingsUpdate):
     model_config = ConfigDict(from_attributes=True)
 
 
+class WebsiteSettingsGeneralResponse(BaseModel):
+    id: int
+    site_name: Optional[str] = None
+    tagline: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    address: Optional[str] = None
+    timezone: Optional[str] = None
+    currency: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ─── Category ───────────────────────────────────────────────────────────────
 
 class CategoryCreate(BaseModel):

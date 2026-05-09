@@ -8,9 +8,19 @@ from pathlib import Path
 from slugify import slugify
 
 from app.core.database import get_db
-from app.models.user import User, Vendor, Product, Category, Shop, ProductVariant, MarketplaceSettings
+from app.models.user import User, Vendor, Product, Category, Shop, ProductVariant, MarketplaceSettings, WebsiteSettings
+from app.schemas.schemas import WebsiteSettingsGeneralResponse
 
 router = APIRouter(prefix="/public", tags=["public"])
+
+CATEGORY_PALETTE = [
+    "#f5ede0", "#fef0f8", "#f0f4fe", "#f5f0e8",
+    "#eef8ee", "#ede8f8", "#fff4e8", "#fde8f0",
+]
+
+
+def _category_bg(index: int) -> str:
+    return CATEGORY_PALETTE[index % len(CATEGORY_PALETTE)]
 
 
 def frontend_path(filename: str) -> Path:
@@ -107,6 +117,72 @@ def effective_storefront_payload(vendor: Vendor, shop: Shop | None, products: li
     draft = settings.storefront_draft if settings and settings.storefront_draft else None
     payload = published or draft or {}
     return merge_dict(defaults, payload)
+
+
+@router.get("/categories")
+async def get_public_categories(db: AsyncSession = Depends(get_db)):
+    """Return all active categories ordered by sort_order."""
+    result = await db.execute(
+        select(Category)
+        .where(Category.is_active == True)
+        .order_by(Category.sort_order, Category.name)
+    )
+    categories = result.scalars().all()
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "slug": c.slug,
+            "description": c.description,
+            "image_url": c.image_url,
+            "sort_order": c.sort_order,
+        }
+        for c in categories
+    ]
+
+
+@router.get("/products")
+async def get_public_products(
+    category_id: int | None = None,
+    limit: int = 12,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return active products, optionally filtered by category_id."""
+    query = (
+        select(Product)
+        .where(func.lower(Product.status) == "active")
+        .options(selectinload(Product.category), selectinload(Product.variants))
+        .order_by(Product.created_at.desc())
+    )
+    if category_id:
+        query = query.where(Product.category_id == category_id)
+    query = query.limit(limit)
+
+    result = await db.execute(query)
+    products = result.scalars().all()
+
+    formatted = []
+    for p in products:
+        discounted_price = float(p.price)
+        if p.discount_percentage and p.discount_percentage > 0:
+            discounted_price = round(float(p.price) * (1 - p.discount_percentage / 100), 2)
+        formatted.append({
+            "id": p.id,
+            "name": p.name,
+            "brand": p.brand or "",
+            "price": float(p.price),
+            "original_price": float(p.original_price) if p.original_price else None,
+            "discount_percentage": p.discount_percentage,
+            "discounted_price": discounted_price,
+            "images": p.images or [],
+            "category_name": p.category.name if p.category else "Uncategorized",
+            "category_id": p.category_id,
+            "rating": p.rating or 0,
+            "review_count": p.review_count or 0,
+            "stock": p.stock,
+        })
+
+    return {"products": formatted, "total": len(formatted)}
 
 
 @router.get("/test")
@@ -457,3 +533,15 @@ async def get_vendors_showcase(db: AsyncSession = Depends(get_db)):
             "vendors": [],
             "total_vendors": 0
         }
+
+
+@router.get("/website-settings/general", response_model=WebsiteSettingsGeneralResponse)
+async def get_public_general_settings(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsGeneralResponse.model_validate(settings)

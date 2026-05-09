@@ -13,7 +13,7 @@ from app.schemas.schemas import (
     CategoryUpdate, CategoryResponse, CouponCreate, CouponUpdate,
     CouponResponse, AdminAnalytics, PaginatedResponse, PayoutResponse,
     FeedbackResponse, AdminFeedbackUpdate,
-    WebsiteSettingsUpdate, WebsiteSettingsResponse
+    WebsiteSettingsUpdate, WebsiteSettingsResponse, WebsiteSettingsGeneralResponse
 )
 from slugify import slugify
 import math
@@ -558,6 +558,15 @@ async def get_website_settings(
 ):
     settings = await _get_or_create_website_settings(db)
     return WebsiteSettingsResponse.model_validate(settings)
+
+
+@router.get("/website-settings/general", response_model=WebsiteSettingsGeneralResponse)
+async def get_general_settings(
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    settings = await _get_or_create_website_settings(db)
+    return WebsiteSettingsGeneralResponse.model_validate(settings)
 
 
 @router.put("/website-settings", response_model=WebsiteSettingsResponse)

@@ -47,6 +47,7 @@ localshop/
 cp .env.example .env
 docker-compose up -d
 python seed.py  # seed categories + admin
+pip freeze > requirements.txt
 ```
 
 API available at: http://localhost:8000  
@@ -63,7 +64,24 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 2. Install dependencies
 pip install -r requirements.txt
-
+pip install uvicorn
+pip install fastapi
+pip install pydantic-settings
+ pip install sqlalchemy   
+ pip install asyncpg  
+ pip install firebase_admin  
+ pip install passlib  
+ pip install python-jose
+ pip install passlib bcrypt
+ pip install email-validator
+ pip install slugify
+ pip install pillow
+ pip install python-multipart
+ pip install psycopg2-binary
+ pip install asyncpg
+ pip uninstall bcrypt passlib -y
+ pip install "bcrypt==4.0.1" "passlib[bcrypt]"
+ pip install fastapi_mail   
 # 3. Setup PostgreSQL
 createdb localshop_db
 
