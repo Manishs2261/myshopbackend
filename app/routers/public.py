@@ -9,7 +9,7 @@ from slugify import slugify
 
 from app.core.database import get_db
 from app.models.user import User, Vendor, Product, Category, Shop, ProductVariant, MarketplaceSettings, WebsiteSettings
-from app.schemas.schemas import WebsiteSettingsGeneralResponse
+from app.schemas.schemas import WebsiteSettingsGeneralResponse, WebsiteSettingsAppearanceResponse, WebsiteSettingsBannerResponse, WebsiteSettingsPromoResponse, WebsiteSettingsBlogResponse, WebsiteSettingsNavResponse, WebsiteSettingsBrowseCategoriesResponse, WebsiteSettingsShippingResponse, WebsiteSettingsSocialResponse, WebsiteSettingsMaintenanceResponse, WebsiteSettingsHomeResponse
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -533,6 +533,126 @@ async def get_vendors_showcase(db: AsyncSession = Depends(get_db)):
             "vendors": [],
             "total_vendors": 0
         }
+
+
+@router.get("/website-settings/home", response_model=WebsiteSettingsHomeResponse)
+async def get_public_home_settings(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsHomeResponse.model_validate(settings)
+
+
+@router.get("/website-settings/maintenance", response_model=WebsiteSettingsMaintenanceResponse)
+async def get_public_maintenance_settings(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsMaintenanceResponse.model_validate(settings)
+
+
+@router.get("/website-settings/social-links", response_model=WebsiteSettingsSocialResponse)
+async def get_public_social_links(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsSocialResponse.model_validate(settings)
+
+
+@router.get("/website-settings/shipping", response_model=WebsiteSettingsShippingResponse)
+async def get_public_shipping_settings(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsShippingResponse.model_validate(settings)
+
+
+@router.get("/website-settings/browse-categories", response_model=WebsiteSettingsBrowseCategoriesResponse)
+async def get_public_browse_categories(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsBrowseCategoriesResponse.model_validate(settings)
+
+
+@router.get("/website-settings/top-navigation", response_model=WebsiteSettingsNavResponse)
+async def get_public_top_navigation(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsNavResponse.model_validate(settings)
+
+
+@router.get("/website-settings/blog-posts", response_model=WebsiteSettingsBlogResponse)
+async def get_public_blog_posts(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsBlogResponse.model_validate(settings)
+
+
+@router.get("/website-settings/promo-sections", response_model=WebsiteSettingsPromoResponse)
+async def get_public_promo_sections(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsPromoResponse.model_validate(settings)
+
+
+@router.get("/website-settings/banner-slider", response_model=WebsiteSettingsBannerResponse)
+async def get_public_banner_slider(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsBannerResponse.model_validate(settings)
+
+
+@router.get("/website-settings/appearance", response_model=WebsiteSettingsAppearanceResponse)
+async def get_public_appearance_settings(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+    return WebsiteSettingsAppearanceResponse.model_validate(settings)
 
 
 @router.get("/website-settings/general", response_model=WebsiteSettingsGeneralResponse)

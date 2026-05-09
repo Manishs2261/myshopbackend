@@ -391,6 +391,154 @@ class WebsiteSettingsGeneralResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class WebsiteSettingsAppearanceResponse(BaseModel):
+    id: int
+    logo_url: Optional[str] = None
+    favicon_url: Optional[str] = None
+    primary_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    theme_mode: Optional[str] = None
+    font_family: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteSettingsBannerResponse(BaseModel):
+    id: int
+    banner_slides: Optional[List[Any]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteSettingsPromoResponse(BaseModel):
+    id: int
+    promo_sections: Optional[List[Any]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteSettingsBlogResponse(BaseModel):
+    id: int
+    blog_posts: Optional[List[Any]] = None
+    blog_view_all_url: Optional[str] = None
+    blog_section_visible: Optional[bool] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteSettingsNavResponse(BaseModel):
+    id: int
+    top_navigation: Optional[List[Any]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteSettingsBrowseCategoriesResponse(BaseModel):
+    id: int
+    browse_categories: Optional[List[Any]] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteSettingsShippingResponse(BaseModel):
+    id: int
+    shipping_free_above: Optional[float] = None
+    shipping_standard_rate: Optional[float] = None
+    shipping_express_rate: Optional[float] = None
+    shipping_estimated_days: Optional[int] = None
+    shipping_policy: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteSettingsSocialResponse(BaseModel):
+    id: int
+    social_facebook: Optional[str] = None
+    social_instagram: Optional[str] = None
+    social_twitter: Optional[str] = None
+    social_youtube: Optional[str] = None
+    social_linkedin: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteSettingsMaintenanceResponse(BaseModel):
+    id: int
+    maintenance_enabled: Optional[bool] = None
+    maintenance_message: Optional[str] = None
+    maintenance_estimated_downtime: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteSettingsHomeResponse(BaseModel):
+    id: int
+    # General
+    site_name: Optional[str] = None
+    tagline: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    address: Optional[str] = None
+    timezone: Optional[str] = None
+    currency: Optional[str] = None
+    # Appearance
+    logo_url: Optional[str] = None
+    favicon_url: Optional[str] = None
+    primary_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    theme_mode: Optional[str] = None
+    font_family: Optional[str] = None
+    # Banner Slider
+    banner_slides: Optional[List[Any]] = None
+    # Promo Sections
+    promo_sections: Optional[List[Any]] = None
+    # Blog Posts
+    blog_posts: Optional[List[Any]] = None
+    blog_view_all_url: Optional[str] = None
+    blog_section_visible: Optional[bool] = None
+    # Navigation
+    top_navigation: Optional[List[Any]] = None
+    browse_categories: Optional[List[Any]] = None
+    # Shipping
+    shipping_free_above: Optional[float] = None
+    shipping_standard_rate: Optional[float] = None
+    shipping_express_rate: Optional[float] = None
+    shipping_estimated_days: Optional[int] = None
+    shipping_policy: Optional[str] = None
+    # Social
+    social_facebook: Optional[str] = None
+    social_instagram: Optional[str] = None
+    social_twitter: Optional[str] = None
+    social_youtube: Optional[str] = None
+    social_linkedin: Optional[str] = None
+    # Maintenance
+    maintenance_enabled: Optional[bool] = None
+    maintenance_message: Optional[str] = None
+    maintenance_estimated_downtime: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ─── Category ───────────────────────────────────────────────────────────────
 
 class CategoryCreate(BaseModel):
