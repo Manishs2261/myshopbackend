@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import selectinload
-from typing import List
+from typing import List, Optional
 from pathlib import Path
 from slugify import slugify
+import math
 
 from app.core.database import get_db
 from app.models.user import User, Vendor, Product, Category, Shop, ProductVariant, MarketplaceSettings, WebsiteSettings
@@ -143,24 +144,86 @@ async def get_public_categories(db: AsyncSession = Depends(get_db)):
 
 @router.get("/products")
 async def get_public_products(
-    category_id: int | None = None,
-    limit: int = 12,
+    # Search
+    search: Optional[str] = Query(None, description="Search by name, brand or description"),
+    # Filters
+    category_id: Optional[int] = Query(None, description="Filter by category ID"),
+    category_slug: Optional[str] = Query(None, description="Filter by category slug"),
+    min_price: Optional[float] = Query(None, description="Minimum price"),
+    max_price: Optional[float] = Query(None, description="Maximum price"),
+    in_stock: Optional[bool] = Query(None, description="Only show in-stock products"),
+    featured: Optional[bool] = Query(None, description="Only show featured products"),
+    brand: Optional[str] = Query(None, description="Filter by brand name"),
+    # Sort
+    sort: Optional[str] = Query("newest", description="Sort: newest | price_asc | price_desc | rating | popular"),
+    # Pagination
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(12, ge=1, le=100, description="Items per page"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return active products, optionally filtered by category_id."""
-    query = (
+    base_query = (
         select(Product)
         .where(func.lower(Product.status) == "active")
         .options(selectinload(Product.category), selectinload(Product.variants))
-        .order_by(Product.created_at.desc())
     )
-    if category_id:
-        query = query.where(Product.category_id == category_id)
-    query = query.limit(limit)
 
-    result = await db.execute(query)
+    # ── Filters ────────────────────────────────────────────────────────────────
+    if search:
+        term = f"%{search.lower()}%"
+        base_query = base_query.where(
+            or_(
+                func.lower(Product.name).like(term),
+                func.lower(Product.brand).like(term),
+                func.lower(Product.description).like(term),
+            )
+        )
+
+    if category_id:
+        base_query = base_query.where(Product.category_id == category_id)
+    elif category_slug:
+        cat_result = await db.execute(select(Category).where(Category.slug == category_slug))
+        cat = cat_result.scalar_one_or_none()
+        if cat:
+            base_query = base_query.where(Product.category_id == cat.id)
+
+    if min_price is not None:
+        base_query = base_query.where(Product.price >= min_price)
+    if max_price is not None:
+        base_query = base_query.where(Product.price <= max_price)
+
+    if in_stock is True:
+        base_query = base_query.where(Product.stock > 0)
+
+    if featured is True:
+        base_query = base_query.where(Product.is_featured == True)
+
+    if brand:
+        base_query = base_query.where(func.lower(Product.brand) == brand.lower())
+
+    # ── Sort ───────────────────────────────────────────────────────────────────
+    if sort == "price_asc":
+        base_query = base_query.order_by(Product.price.asc())
+    elif sort == "price_desc":
+        base_query = base_query.order_by(Product.price.desc())
+    elif sort == "rating":
+        base_query = base_query.order_by(Product.rating.desc())
+    elif sort == "popular":
+        base_query = base_query.order_by(Product.view_count.desc())
+    else:
+        base_query = base_query.order_by(Product.created_at.desc())
+
+    # ── Total count ────────────────────────────────────────────────────────────
+    count_result = await db.execute(select(func.count()).select_from(base_query.subquery()))
+    total = count_result.scalar() or 0
+    total_pages = math.ceil(total / limit) if total else 1
+
+    # ── Paginate ───────────────────────────────────────────────────────────────
+    offset = (page - 1) * limit
+    paged_query = base_query.offset(offset).limit(limit)
+    result = await db.execute(paged_query)
     products = result.scalars().all()
 
+    # ── Format ─────────────────────────────────────────────────────────────────
     formatted = []
     for p in products:
         discounted_price = float(p.price)
@@ -169,20 +232,62 @@ async def get_public_products(
         formatted.append({
             "id": p.id,
             "name": p.name,
+            "slug": p.slug,
             "brand": p.brand or "",
+            "description": p.description or "",
             "price": float(p.price),
             "original_price": float(p.original_price) if p.original_price else None,
             "discount_percentage": p.discount_percentage,
             "discounted_price": discounted_price,
             "images": p.images or [],
-            "category_name": p.category.name if p.category else "Uncategorized",
+            "tags": p.tags or [],
+            "unit": p.unit or "",
             "category_id": p.category_id,
+            "category_name": p.category.name if p.category else "Uncategorized",
+            "category_slug": p.category.slug if p.category else None,
             "rating": p.rating or 0,
             "review_count": p.review_count or 0,
             "stock": p.stock,
+            "in_stock": (p.stock or 0) > 0,
+            "is_featured": p.is_featured or False,
+            "view_count": p.view_count or 0,
+            "variants": [
+                {
+                    "id": v.id,
+                    "size": v.size,
+                    "color": v.color,
+                    "sku": v.sku,
+                    "price": float(v.price) if v.price else None,
+                    "stock": v.stock,
+                    "images": v.images or [],
+                }
+                for v in p.variants
+            ],
+            "created_at": p.created_at.isoformat() if p.created_at else None,
         })
 
-    return {"products": formatted, "total": len(formatted)}
+    return {
+        "products": formatted,
+        "pagination": {
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1,
+        },
+        "filters_applied": {
+            "search": search,
+            "category_id": category_id,
+            "category_slug": category_slug,
+            "min_price": min_price,
+            "max_price": max_price,
+            "in_stock": in_stock,
+            "featured": featured,
+            "brand": brand,
+            "sort": sort,
+        },
+    }
 
 
 @router.get("/test")
