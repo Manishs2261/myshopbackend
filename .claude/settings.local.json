@@ -5,7 +5,9 @@
       "PowerShell(ls \"d:\\\\where my shop\\\\backend\\\\frontend\" | Select-Object Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}})",
       "Bash(Get-ChildItem -Path \"e:\\\\where my shop\\\\myshopbackend\\\\app\\\\routers\" -File)",
       "Bash(Select-Object -ExpandProperty Name)",
-      "Bash(python seed_products.py)"
+      "Bash(python seed_products.py)",
+      "Bash(Get-Content \"e:\\\\where my shop\\\\myshop-page\\\\src\\\\components\\\\layout\\\\Header.css\")",
+      "Bash(Select-Object -Last 30)"
     ]
   }
 }

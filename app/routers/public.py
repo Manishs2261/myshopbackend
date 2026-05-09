@@ -290,6 +290,47 @@ async def get_public_products(
     }
 
 
+@router.get("/products/suggestions")
+async def get_product_suggestions(
+    q: str = Query("", description="Search query"),
+    limit: int = Query(8, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return lightweight product suggestions for autocomplete (name + brand + image + price)."""
+    q = q.strip()
+    if len(q) < 2:
+        return []
+
+    term = f"%{q.lower()}%"
+    result = await db.execute(
+        select(Product.id, Product.name, Product.brand, Product.images, Product.price, Product.original_price, Product.discount_percentage, Product.slug)
+        .where(func.lower(Product.status) == "approved")
+        .where(
+            or_(
+                func.lower(Product.name).like(term),
+                func.lower(Product.brand).like(term),
+            )
+        )
+        .order_by(Product.view_count.desc(), Product.rating.desc())
+        .limit(limit)
+    )
+    rows = result.all()
+    suggestions = []
+    for r in rows:
+        price = float(r.price or 0)
+        if r.discount_percentage and r.discount_percentage > 0:
+            price = round(price * (1 - r.discount_percentage / 100), 2)
+        suggestions.append({
+            "id": r.id,
+            "name": r.name,
+            "brand": r.brand,
+            "image": (r.images or [None])[0],
+            "price": price,
+            "slug": r.slug,
+        })
+    return suggestions
+
+
 @router.get("/products/{product_id}/related")
 async def get_related_products(product_id: int, limit: int = 6, db: AsyncSession = Depends(get_db)):
     # Get current product's category
