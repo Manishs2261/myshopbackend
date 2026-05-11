@@ -5,29 +5,45 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 import time
+import logging
+import sys
 from pathlib import Path
+
+logging.basicConfig(
+    stream=sys.stderr,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+log = logging.getLogger("localshop")
+
+log.info("Importing app modules...")
 
 from app.core.config import settings
 from app.core.database import create_tables
 from app.core.firebase import init_firebase
 
+log.info("Core modules loaded. Loading routers...")
+
 # Import all routers
 from app.routers import auth, user, vendor, admin, cart, orders, payments, analytics, reviews, coupons, public
+
+log.info("All routers loaded.")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 Starting LocalShop API...")
+    log.info("Starting LocalShop API...")
+    log.info(f"DATABASE_URL set: {bool(settings.DATABASE_URL and 'localhost' not in settings.DATABASE_URL)}")
     try:
         await create_tables()
-        print("✅ Database tables ready")
+        log.info("Database tables ready")
     except Exception as e:
-        print(f"❌ Database startup error: {e}")
-        print("   Check that DATABASE_URL is set correctly in your environment.")
+        log.error(f"Database startup error: {e}")
+        log.error("Check that DATABASE_URL is set correctly in your environment.")
         raise
     init_firebase()
     yield
-    print("👋 Shutting down LocalShop API...")
+    log.info("Shutting down LocalShop API...")
 
 
 app = FastAPI(
