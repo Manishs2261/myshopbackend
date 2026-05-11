@@ -17,13 +17,16 @@ from app.routers import auth, user, vendor, admin, cart, orders, payments, analy
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     print("🚀 Starting LocalShop API...")
-    await create_tables()
+    try:
+        await create_tables()
+        print("✅ Database tables ready")
+    except Exception as e:
+        print(f"❌ Database startup error: {e}")
+        print("   Check that DATABASE_URL is set correctly in your environment.")
+        raise
     init_firebase()
-    print("✅ Database tables created")
     yield
-    # Shutdown
     print("👋 Shutting down LocalShop API...")
 
 
