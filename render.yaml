@@ -8,31 +8,61 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      # ── Secrets: set these manually in Render dashboard ────────────────────
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
         sync: false
-      - key: SUPABASE_URL
-        sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: SUPABASE_STORAGE_BUCKET
-        value: product-images
-      - key: FIREBASE_CREDENTIALS_PATH
-        value: /etc/secrets/firebase-credentials.json
       - key: RAZORPAY_KEY_ID
         sync: false
       - key: RAZORPAY_KEY_SECRET
         sync: false
-      - key: ALLOWED_ORIGINS
+      - key: MAIL_USERNAME
         sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+
+      # ── Non-sensitive: committed values ────────────────────────────────────
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: DEBUG
         value: "false"
+      - key: APP_NAME
+        value: LocalShop
+
+      - key: SUPABASE_URL
+        value: https://zqqzgkykjyxeqfhenmrf.supabase.co
+      - key: SUPABASE_STORAGE_BUCKET
+        value: product_image
+
       - key: ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "30"
       - key: REFRESH_TOKEN_EXPIRE_DAYS
         value: "7"
+
+      - key: FIREBASE_CREDENTIALS_PATH
+        value: /etc/secrets/firebase-credentials.json
+
+      - key: MAIL_FROM
+        value: app.appixo@gmail.com
+      - key: MAIL_FROM_NAME
+        value: LocalShop
+      - key: MAIL_SERVER
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_STARTTLS
+        value: "true"
+      - key: MAIL_SSL_TLS
+        value: "false"
+      - key: USE_CREDENTIALS
+        value: "true"
+      - key: VALIDATE_CERTS
+        value: "true"
+
+      - key: ALLOWED_ORIGINS
+        sync: false
