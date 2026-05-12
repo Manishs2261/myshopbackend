@@ -7,7 +7,9 @@
       "Bash(Select-Object -ExpandProperty Name)",
       "Bash(python seed_products.py)",
       "Bash(Get-Content \"e:\\\\where my shop\\\\myshop-page\\\\src\\\\components\\\\layout\\\\Header.css\")",
-      "Bash(Select-Object -Last 30)"
+      "Bash(Select-Object -Last 30)",
+      "Bash(Get-ChildItem -Path \"e:\\\\where my shop\\\\myshop-page\" -Recurse -Filter \"*slider*\" -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }
