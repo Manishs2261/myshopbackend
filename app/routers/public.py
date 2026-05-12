@@ -24,6 +24,25 @@ def _category_bg(index: int) -> str:
     return CATEGORY_PALETTE[index % len(CATEGORY_PALETTE)]
 
 
+def _shop_snapshot(vendor, shop) -> dict:
+    if not vendor:
+        return {}
+    return {
+        "vendor_id": vendor.id,
+        "shop_name": (shop.name if shop and shop.name else vendor.business_name) or "",
+        "shop_phone": vendor.business_phone or "",
+        "shop_lat": float(shop.latitude) if shop and shop.latitude else None,
+        "shop_lng": float(shop.longitude) if shop and shop.longitude else None,
+        "shop_city": shop.city if shop else None,
+        "shop_address": shop.address if shop else None,
+        "shop_state": shop.state if shop else None,
+        "shop_logo": shop.logo_url if shop else None,
+        "opening_time": str(shop.opening_time) if shop and shop.opening_time else None,
+        "closing_time": str(shop.closing_time) if shop and shop.closing_time else None,
+        "working_days": shop.working_days if shop else [],
+    }
+
+
 def frontend_path(filename: str) -> Path:
     return Path(__file__).resolve().parents[2] / "frontend" / filename
 
@@ -164,7 +183,11 @@ async def get_public_products(
     base_query = (
         select(Product)
         .where(func.lower(Product.status) == "approved")
-        .options(selectinload(Product.category), selectinload(Product.variants))
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.variants),
+            selectinload(Product.vendor).selectinload(Vendor.shop),
+        )
     )
 
     # ── Filters ────────────────────────────────────────────────────────────────
@@ -229,6 +252,7 @@ async def get_public_products(
         discounted_price = float(p.price)
         if p.discount_percentage and p.discount_percentage > 0:
             discounted_price = round(float(p.price) * (1 - p.discount_percentage / 100), 2)
+        shop = p.vendor.shop if p.vendor else None
         formatted.append({
             "id": p.id,
             "name": p.name,
@@ -264,6 +288,7 @@ async def get_public_products(
                 for v in p.variants
             ],
             "created_at": p.created_at.isoformat() if p.created_at else None,
+            **_shop_snapshot(p.vendor, shop),
         })
 
     return {
@@ -376,7 +401,11 @@ async def get_public_product_by_id(product_id: int, db: AsyncSession = Depends(g
         select(Product)
         .where(Product.id == product_id)
         .where(func.lower(Product.status) == "approved")
-        .options(selectinload(Product.category), selectinload(Product.variants))
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.variants),
+            selectinload(Product.vendor).selectinload(Vendor.shop),
+        )
     )
     product = result.scalar_one_or_none()
     if not product:
@@ -386,6 +415,7 @@ async def get_public_product_by_id(product_id: int, db: AsyncSession = Depends(g
     if product.discount_percentage and product.discount_percentage > 0:
         discounted_price = round(float(product.price) * (1 - product.discount_percentage / 100), 2)
 
+    shop = product.vendor.shop if product.vendor else None
     return {
         "id": product.id,
         "name": product.name,
@@ -421,6 +451,178 @@ async def get_public_product_by_id(product_id: int, db: AsyncSession = Depends(g
             for v in product.variants
         ],
         "created_at": product.created_at.isoformat() if product.created_at else None,
+        **_shop_snapshot(product.vendor, shop),
+    }
+
+
+@router.get("/products/{product_id}/shops")
+async def get_product_shops(product_id: int, db: AsyncSession = Depends(get_db)):
+    """Return all shops that carry a specific product (approved products only)."""
+    result = await db.execute(
+        select(Product)
+        .where(Product.id == product_id)
+        .where(func.lower(Product.status) == "approved")
+        .options(selectinload(Product.vendor).selectinload(Vendor.shop))
+    )
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    vendor = product.vendor
+    shop = vendor.shop if vendor else None
+    snap = _shop_snapshot(vendor, shop)
+    if not snap:
+        return []
+
+    discounted_price = float(product.price)
+    if product.discount_percentage and product.discount_percentage > 0:
+        discounted_price = round(float(product.price) * (1 - product.discount_percentage / 100), 2)
+
+    return [{
+        **snap,
+        "product_id": product.id,
+        "price": float(product.price),
+        "discounted_price": discounted_price,
+        "stock": product.stock,
+        "in_stock": (product.stock or 0) > 0,
+    }]
+
+
+@router.get("/shops")
+async def get_public_shops(
+    search: Optional[str] = Query(None, description="Search shop name, city, state, address, description"),
+    city: Optional[str] = Query(None, description="Filter by city (case-insensitive)"),
+    state: Optional[str] = Query(None, description="Filter by state (case-insensitive)"),
+    pincode: Optional[str] = Query(None, description="Filter by pincode"),
+    verified: Optional[bool] = Query(None, description="Only show verified shops"),
+    lat: Optional[float] = Query(None, description="User latitude for distance sorting"),
+    lng: Optional[float] = Query(None, description="User longitude for distance sorting"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(12, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Server-side search, filter, and paginate all approved shops."""
+    # ── Build base query ──────────────────────────────────────────────────────
+    base_q = (
+        select(Vendor)
+        .join(Shop, Shop.vendor_id == Vendor.id)
+        .where(Vendor.status == "approved")
+        .options(selectinload(Vendor.shop))
+    )
+
+    if search:
+        term = f"%{search.lower()}%"
+        base_q = base_q.where(
+            or_(
+                func.lower(Shop.name).like(term),
+                func.lower(Vendor.business_name).like(term),
+                func.lower(Shop.city).like(term),
+                func.lower(Shop.state).like(term),
+                func.lower(Shop.address).like(term),
+                func.lower(Shop.description).like(term),
+            )
+        )
+
+    if city:
+        base_q = base_q.where(func.lower(Shop.city).like(f"%{city.lower()}%"))
+
+    if state:
+        base_q = base_q.where(func.lower(Shop.state).like(f"%{state.lower()}%"))
+
+    if pincode:
+        base_q = base_q.where(Shop.pincode == pincode)
+
+    if verified is True:
+        base_q = base_q.where(Vendor.verified == True)
+
+    # ── Count ─────────────────────────────────────────────────────────────────
+    count_result = await db.execute(select(func.count()).select_from(base_q.subquery()))
+    total = count_result.scalar() or 0
+    total_pages = math.ceil(total / limit) if total else 1
+
+    # ── Product counts per vendor ─────────────────────────────────────────────
+    prod_count_result = await db.execute(
+        select(Product.vendor_id, func.count(Product.id).label("cnt"))
+        .where(func.lower(Product.status) == "approved")
+        .group_by(Product.vendor_id)
+    )
+    product_counts = {row.vendor_id: row.cnt for row in prod_count_result.all()}
+
+    # ── Fetch page (no distance sort in SQL — done in Python) ─────────────────
+    if lat and lng:
+        # fetch all matching rows, sort by distance, then slice
+        result = await db.execute(base_q)
+        all_vendors = result.scalars().all()
+
+        def _dist(v):
+            s = v.shop
+            if s and s.latitude and s.longitude:
+                dlat = math.radians(float(s.latitude) - lat)
+                dlng = math.radians(float(s.longitude) - lng)
+                a = (math.sin(dlat / 2) ** 2 +
+                     math.cos(math.radians(lat)) * math.cos(math.radians(float(s.latitude))) *
+                     math.sin(dlng / 2) ** 2)
+                return 6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+            return 9999
+
+        all_vendors.sort(key=_dist)
+        offset = (page - 1) * limit
+        vendors = all_vendors[offset: offset + limit]
+    else:
+        base_q = base_q.order_by(Vendor.created_at.desc())
+        result = await db.execute(base_q.offset((page - 1) * limit).limit(limit))
+        vendors = result.scalars().all()
+
+    # ── Format ────────────────────────────────────────────────────────────────
+    shops = []
+    for vendor in vendors:
+        shop = vendor.shop
+        if not shop:
+            continue
+
+        shop_lat = float(shop.latitude) if shop.latitude else None
+        shop_lng = float(shop.longitude) if shop.longitude else None
+
+        distance_km = None
+        if lat and lng and shop_lat and shop_lng:
+            dlat = math.radians(shop_lat - lat)
+            dlng = math.radians(shop_lng - lng)
+            a = (math.sin(dlat / 2) ** 2 +
+                 math.cos(math.radians(lat)) * math.cos(math.radians(shop_lat)) *
+                 math.sin(dlng / 2) ** 2)
+            distance_km = round(6371 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)), 2)
+
+        shops.append({
+            "vendor_id": vendor.id,
+            "shop_name": shop.name or vendor.business_name or "",
+            "description": shop.description or "",
+            "logo_url": shop.logo_url,
+            "banner_url": shop.banner_url,
+            "city": shop.city,
+            "state": shop.state,
+            "address": shop.address,
+            "pincode": shop.pincode,
+            "shop_phone": vendor.business_phone or "",
+            "shop_lat": shop_lat,
+            "shop_lng": shop_lng,
+            "verified": vendor.verified or False,
+            "opening_time": str(shop.opening_time) if shop.opening_time else None,
+            "closing_time": str(shop.closing_time) if shop.closing_time else None,
+            "working_days": shop.working_days or [],
+            "total_products": product_counts.get(vendor.id, 0),
+            "distance_km": distance_km,
+        })
+
+    return {
+        "shops": shops,
+        "pagination": {
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1,
+        },
     }
 
 
@@ -548,10 +750,12 @@ async def get_vendor_public_profile(vendor_id: int, db: AsyncSession = Depends(g
             "city": shop.city if shop else None,
             "state": shop.state if shop else None,
             "postal_code": shop.pincode if shop else None,
+            "latitude": float(shop.latitude) if shop and shop.latitude else None,
+            "longitude": float(shop.longitude) if shop and shop.longitude else None,
             "contact_phone": vendor.business_phone or (user.phone if user else None),
             "contact_email": vendor.business_email or (user.email if user else None),
-            "opening_time": shop.opening_time if shop else None,
-            "closing_time": shop.closing_time if shop else None,
+            "opening_time": str(shop.opening_time) if shop and shop.opening_time else None,
+            "closing_time": str(shop.closing_time) if shop and shop.closing_time else None,
             "working_days": shop.working_days if shop else [],
         }
         
@@ -743,6 +947,8 @@ async def get_vendors_showcase(db: AsyncSession = Depends(get_db)):
                 "address": shop.address if shop else None,
                 "city": shop.city if shop else None,
                 "state": shop.state if shop else None,
+                "latitude": float(shop.latitude) if shop and shop.latitude else None,
+                "longitude": float(shop.longitude) if shop and shop.longitude else None,
                 "contact_phone": vendor.business_phone or (user.phone if user else None),
                 "contact_email": vendor.business_email or (user.email if user else None),
                 "status": vendor.status,
@@ -750,8 +956,8 @@ async def get_vendors_showcase(db: AsyncSession = Depends(get_db)):
                 "created_at": vendor.created_at.isoformat() if vendor.created_at else None,
                 "banner_url": shop.banner_url if shop else None,
                 "logo_url": shop.logo_url if shop else None,
-                "opening_time": shop.opening_time if shop else None,
-                "closing_time": shop.closing_time if shop else None,
+                "opening_time": str(shop.opening_time) if shop and shop.opening_time else None,
+                "closing_time": str(shop.closing_time) if shop and shop.closing_time else None,
                 "working_days": shop.working_days if shop else [],
                 "total_products": len(formatted_products),
                 "products": formatted_products,
