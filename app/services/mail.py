@@ -5,18 +5,31 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-conf = ConnectionConfig(
-    MAIL_USERNAME=settings.MAIL_USERNAME,
-    MAIL_PASSWORD=settings.MAIL_PASSWORD,
-    MAIL_FROM=settings.MAIL_FROM,
-    MAIL_PORT=settings.MAIL_PORT,
-    MAIL_SERVER=settings.MAIL_SERVER,
-    MAIL_FROM_NAME=settings.MAIL_FROM_NAME,
-    MAIL_STARTTLS=settings.MAIL_STARTTLS,
-    MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
-    USE_CREDENTIALS=settings.USE_CREDENTIALS,
-    VALIDATE_CERTS=settings.VALIDATE_CERTS
-)
+_conf: ConnectionConfig | None = None
+
+def _get_conf() -> ConnectionConfig | None:
+    global _conf
+    if _conf is not None:
+        return _conf
+    if not settings.MAIL_USERNAME or not settings.MAIL_PASSWORD:
+        logger.warning("MAIL_USERNAME/MAIL_PASSWORD not set — email sending disabled.")
+        return None
+    try:
+        _conf = ConnectionConfig(
+            MAIL_USERNAME=settings.MAIL_USERNAME,
+            MAIL_PASSWORD=settings.MAIL_PASSWORD,
+            MAIL_FROM=settings.MAIL_FROM,
+            MAIL_PORT=settings.MAIL_PORT,
+            MAIL_SERVER=settings.MAIL_SERVER,
+            MAIL_FROM_NAME=settings.MAIL_FROM_NAME,
+            MAIL_STARTTLS=settings.MAIL_STARTTLS,
+            MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
+            USE_CREDENTIALS=settings.USE_CREDENTIALS,
+            VALIDATE_CERTS=settings.VALIDATE_CERTS,
+        )
+    except Exception as e:
+        logger.error(f"Mail configuration error: {e}")
+    return _conf
 
 class MailService:
     @staticmethod
@@ -50,13 +63,16 @@ class MailService:
             subtype=MessageType.html
         )
 
+        conf = _get_conf()
+        if conf is None:
+            logger.warning(f"Email not configured — OTP for {email}: {otp}")
+            return
         fm = FastMail(conf)
         try:
             await fm.send_message(message)
             logger.info(f"OTP email sent to {email}")
         except Exception as e:
             logger.error(f"Failed to send OTP email to {email}: {str(e)}")
-            # For development, print the OTP if email fails
             if settings.DEBUG:
                 print(f"\n[DEV MODE] FAILED TO SEND EMAIL. OTP for {email} is: {otp}\n")
 
@@ -94,6 +110,10 @@ class MailService:
             subtype=MessageType.html
         )
 
+        conf = _get_conf()
+        if conf is None:
+            logger.warning(f"Email not configured — reset token for {email}: {token}")
+            return
         fm = FastMail(conf)
         try:
             await fm.send_message(message)
