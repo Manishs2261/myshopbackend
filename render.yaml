@@ -65,4 +65,4 @@ services:
         value: "true"
 
       - key: ALLOWED_ORIGINS
-        value: "https://myshop-page-blond.vercel.app,http://localhost:3000,http://localhost:5173,http://localhost:8080"
+        value: "https://myshop-page-blond.vercel.app,https://vendor-panel-psi.vercel.app,https://myshopadmin-panel.vercel.app,http://localhost:3000,http://localhost:5173,http://localhost:8080"
