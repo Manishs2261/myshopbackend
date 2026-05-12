@@ -25,7 +25,8 @@ from app.core.firebase import init_firebase
 log.info("Core modules loaded. Loading routers...")
 
 # Import all routers
-from app.routers import auth, user, vendor, admin, cart, orders, payments, analytics, reviews, coupons, public
+from app.routers import auth, user, vendor, admin, cart, orders, payments, analytics, reviews, coupons, public, sponsorship
+import app.models.sponsorship  # noqa: F401 — registers tables with Base metadata
 
 log.info("All routers loaded.")
 
@@ -156,6 +157,7 @@ app.include_router(reviews.router)
 app.include_router(coupons.router)
 app.include_router(vendor.router)
 app.include_router(admin.router)
+app.include_router(sponsorship.router)
 
 
 def frontend_file(filename: str) -> str:

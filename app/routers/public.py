@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, and_
+from sqlalchemy import select, func, or_, and_, update as sql_update
+from datetime import datetime, timezone
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from pathlib import Path
@@ -10,6 +11,7 @@ import math
 
 from app.core.database import get_db
 from app.models.user import User, Vendor, Product, Category, Shop, ProductVariant, MarketplaceSettings, WebsiteSettings
+from app.models.sponsorship import VendorSponsorship
 from app.schemas.schemas import WebsiteSettingsGeneralResponse, WebsiteSettingsAppearanceResponse, WebsiteSettingsBannerResponse, WebsiteSettingsPromoResponse, WebsiteSettingsBlogResponse, WebsiteSettingsNavResponse, WebsiteSettingsBrowseCategoriesResponse, WebsiteSettingsShippingResponse, WebsiteSettingsSocialResponse, WebsiteSettingsMaintenanceResponse, WebsiteSettingsHomeResponse
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -422,6 +424,95 @@ async def get_product_suggestions(
             "slug": r.slug,
         })
     return suggestions
+
+
+@router.get("/products/sponsored")
+async def get_sponsored_products(
+    search: Optional[str] = Query(None),
+    category_id: Optional[int] = Query(None),
+    category_slug: Optional[str] = Query(None),
+    brand: Optional[str] = Query(None),
+    limit: int = Query(10, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    base_query = (
+        select(Product)
+        .where(func.lower(Product.status) == "approved")
+        .where(Product.is_featured == True)
+        .options(selectinload(Product.category), selectinload(Product.variants))
+        .order_by(Product.view_count.desc(), Product.rating.desc())
+    )
+
+    q = base_query
+    if search:
+        term = f"%{search.lower()}%"
+        q = q.where(or_(
+            func.lower(Product.name).like(term),
+            func.lower(Product.brand).like(term),
+            func.lower(Product.description).like(term),
+        ))
+    if category_id:
+        q = q.where(Product.category_id == category_id)
+    elif category_slug:
+        cat_result = await db.execute(select(Category).where(Category.slug == category_slug))
+        cat = cat_result.scalar_one_or_none()
+        if cat:
+            q = q.where(Product.category_id == cat.id)
+    if brand:
+        q = q.where(func.lower(Product.brand) == brand.lower())
+
+    result = await db.execute(q.limit(limit))
+    products = result.scalars().all()
+
+    # Fallback: if no featured products match the context, return top featured products
+    if not products and (search or category_id or category_slug or brand):
+        result = await db.execute(base_query.limit(limit))
+        products = result.scalars().all()
+
+    formatted = []
+    for p in products:
+        discounted_price = float(p.price)
+        if p.discount_percentage and p.discount_percentage > 0:
+            discounted_price = round(float(p.price) * (1 - p.discount_percentage / 100), 2)
+        formatted.append({
+            "id": p.id,
+            "name": p.name,
+            "slug": p.slug,
+            "brand": p.brand or "",
+            "description": p.description or "",
+            "price": float(p.price),
+            "original_price": float(p.original_price) if p.original_price else None,
+            "discount_percentage": p.discount_percentage,
+            "discounted_price": discounted_price,
+            "images": p.images or [],
+            "tags": p.tags or [],
+            "unit": p.unit or "",
+            "category_id": p.category_id,
+            "category_name": p.category.name if p.category else "Uncategorized",
+            "category_slug": p.category.slug if p.category else None,
+            "rating": p.rating or 0,
+            "review_count": p.review_count or 0,
+            "stock": p.stock,
+            "in_stock": (p.stock or 0) > 0,
+            "is_featured": True,
+            "is_sponsored": True,
+            "view_count": p.view_count or 0,
+            "variants": [
+                {
+                    "id": v.id,
+                    "size": v.size,
+                    "color": v.color,
+                    "sku": v.sku,
+                    "price": float(v.price) if v.price else None,
+                    "stock": v.stock,
+                    "images": v.images or [],
+                }
+                for v in p.variants
+            ],
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        })
+
+    return {"products": formatted}
 
 
 @router.get("/products/{product_id}/related")
@@ -1186,3 +1277,239 @@ async def get_public_general_settings(db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(settings)
     return WebsiteSettingsGeneralResponse.model_validate(settings)
+
+
+# ─── Public Shops Listing ────────────────────────────────────────────────────
+
+@router.get("/shops")
+async def get_public_shops(
+    page: int = Query(1, ge=1),
+    limit: int = Query(12, ge=1, le=50),
+    search: Optional[str] = Query(None),
+    city: Optional[str] = Query(None),
+    lat: Optional[float] = Query(None),
+    lng: Optional[float] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import case as sql_case
+    from app.models.user import Product
+
+    # Base query: approved vendors with their shops
+    query = (
+        select(Vendor, Shop)
+        .join(Shop, Shop.vendor_id == Vendor.id)
+        .where(Vendor.status == "approved", Shop.status == "active")
+    )
+
+    if search:
+        term = f"%{search}%"
+        query = query.where(
+            or_(
+                Shop.name.ilike(term),
+                Shop.description.ilike(term),
+                Shop.address.ilike(term),
+                Shop.city.ilike(term),
+                Vendor.business_name.ilike(term),
+            )
+        )
+
+    if city:
+        query = query.where(Shop.city.ilike(f"%{city}%"))
+
+    # Count total before pagination
+    count_q = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_q)).scalar() or 0
+
+    result = await db.execute(query.offset((page - 1) * limit).limit(limit))
+    rows = result.all()
+
+    # Count products per vendor in one query
+    vendor_ids = [r.Vendor.id for r in rows]
+    product_counts: dict[int, int] = {}
+    if vendor_ids:
+        pc_result = await db.execute(
+            select(Product.vendor_id, func.count(Product.id).label("cnt"))
+            .where(Product.vendor_id.in_(vendor_ids), Product.status == "approved")
+            .group_by(Product.vendor_id)
+        )
+        product_counts = {r.vendor_id: r.cnt for r in pc_result}
+
+    shops = []
+    for row in rows:
+        vendor: Vendor = row.Vendor
+        shop: Shop = row.Shop
+        distance_km = None
+        if lat is not None and lng is not None and shop.latitude and shop.longitude:
+            distance_km = round(_haversine_km(lat, lng, shop.latitude, shop.longitude), 1)
+
+        shops.append({
+            "vendor_id": vendor.id,
+            "shop_name": shop.name,
+            "description": shop.description,
+            "city": shop.city,
+            "state": shop.state,
+            "logo_url": shop.logo_url,
+            "banner_url": shop.banner_url,
+            "opening_time": shop.opening_time,
+            "closing_time": shop.closing_time,
+            "working_days": shop.working_days,
+            "shop_lat": shop.latitude,
+            "shop_lng": shop.longitude,
+            "shop_phone": vendor.business_phone,
+            "verified": vendor.verified,
+            "total_products": product_counts.get(vendor.id, 0),
+            "distance_km": distance_km,
+        })
+
+    # Sort by distance if GPS provided
+    if lat is not None and lng is not None:
+        shops.sort(key=lambda s: s["distance_km"] if s["distance_km"] is not None else 9999)
+
+    pages = max(1, -(-total // limit))
+    return {
+        "shops": shops,
+        "pagination": {
+            "total": total,
+            "page": page,
+            "pages": pages,
+            "has_next": page < pages,
+        },
+    }
+
+
+# ─── Sponsored Vendors ────────────────────────────────────────────────────────
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+@router.get("/vendors/sponsored")
+async def get_sponsored_vendors(
+    search: Optional[str] = Query(None),
+    category_id: Optional[int] = Query(None),
+    city: Optional[str] = Query(None),
+    latitude: Optional[float] = Query(None),
+    longitude: Optional[float] = Query(None),
+    radius_km: float = Query(50.0),
+    limit: int = Query(10, ge=1, le=30),
+    db: AsyncSession = Depends(get_db),
+):
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(VendorSponsorship)
+        .options(
+            selectinload(VendorSponsorship.vendor).selectinload(Vendor.shop),
+        )
+        .where(
+            VendorSponsorship.status == "active",
+            VendorSponsorship.start_date <= now,
+            VendorSponsorship.end_date >= now,
+        )
+    )
+    sponsorships = result.scalars().all()
+
+    # Batch product count for all active sponsored vendors
+    eligible = [s for s in sponsorships if s.vendor and s.vendor.status == "approved"]
+    vendor_ids = [s.vendor.id for s in eligible]
+    product_counts: dict[int, int] = {}
+    if vendor_ids:
+        count_rows = await db.execute(
+            select(Product.vendor_id, func.count(Product.id))
+            .where(Product.vendor_id.in_(vendor_ids), func.lower(Product.status) == "approved")
+            .group_by(Product.vendor_id)
+        )
+        product_counts = {row[0]: row[1] for row in count_rows.all()}
+
+    scored = []
+    ids_to_increment_views = []
+
+    for s in eligible:
+        vendor = s.vendor
+        shop = vendor.shop
+
+        score = 0
+
+        # Category relevance
+        cats = s.target_categories or []
+        if category_id and category_id in cats:
+            score += 3
+
+        # City relevance
+        locs = [loc.lower() for loc in (s.target_locations or [])]
+        if city and city.lower() in locs:
+            score += 2
+        elif shop and shop.city and city and shop.city.lower() == city.lower():
+            score += 1
+
+        # Keyword relevance
+        if search:
+            kws = [kw.lower() for kw in (s.target_keywords or [])]
+            for kw in kws:
+                if kw in search.lower():
+                    score += 1
+
+        # Location/distance relevance
+        if latitude is not None and longitude is not None and shop and shop.latitude and shop.longitude:
+            dist = _haversine_km(latitude, longitude, shop.latitude, shop.longitude)
+            if dist <= radius_km:
+                score += 2
+
+        ids_to_increment_views.append(s.id)
+
+        scored.append({
+            "score": score,
+            "priority": s.priority or 1,
+            "vendor_id": vendor.id,
+            "business_name": vendor.business_name,
+            "shop": {
+                "name": shop.name if shop else None,
+                "logo_url": shop.logo_url if shop else None,
+                "banner_url": shop.banner_url if shop else None,
+                "city": shop.city if shop else None,
+                "latitude": shop.latitude if shop else None,
+                "longitude": shop.longitude if shop else None,
+                "status": shop.status if shop else None,
+                "opening_time": shop.opening_time if shop else None,
+                "closing_time": shop.closing_time if shop else None,
+                "working_days": shop.working_days if shop else None,
+                "phone": vendor.business_phone,
+                "total_products": product_counts.get(vendor.id, 0),
+            },
+            "sponsorship": {"id": s.id, "priority": s.priority or 1},
+            "is_sponsored": True,
+        })
+
+    # Atomic view_count increment for all fetched active sponsorships
+    if ids_to_increment_views:
+        await db.execute(
+            sql_update(VendorSponsorship)
+            .where(VendorSponsorship.id.in_(ids_to_increment_views))
+            .values(view_count=VendorSponsorship.view_count + 1)
+        )
+        await db.commit()
+
+    scored.sort(key=lambda x: (-x["score"], -x["priority"]))
+    result_list = scored[:limit]
+    for item in result_list:
+        item.pop("score", None)
+        item.pop("priority", None)
+
+    return {"vendors": result_list, "total": len(result_list)}
+
+
+@router.post("/vendors/sponsored/{sponsorship_id}/track")
+async def track_sponsored_vendor_click(
+    sponsorship_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    await db.execute(
+        sql_update(VendorSponsorship)
+        .where(VendorSponsorship.id == sponsorship_id)
+        .values(click_count=VendorSponsorship.click_count + 1)
+    )
+    await db.commit()
+    return {"ok": True}

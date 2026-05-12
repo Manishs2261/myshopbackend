@@ -153,6 +153,7 @@ class Vendor(Base):
     payouts = relationship("Payout", back_populates="vendor")
     marketplace_settings = relationship("MarketplaceSettings", back_populates="vendor", uselist=False)
     feedbacks = relationship("VendorFeedback", back_populates="vendor")
+    sponsorships = relationship("VendorSponsorship", back_populates="vendor")
 
 
 class Shop(Base):

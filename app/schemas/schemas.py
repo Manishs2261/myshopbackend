@@ -1012,4 +1012,95 @@ class AdminAnalytics(BaseModel):
     top_products: List[Dict]
     cart_abandonment_rate: float
     pending_vendor_approvals: int
+
+
+# ─── Sponsorship ────────────────────────────────────────────────────────────
+
+class SponsorshipPlanCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: Decimal = Decimal("0")
+    duration_days: int = 30
+    priority: int = 1
+    max_categories: int = 3
+    max_locations: int = 3
+    is_active: bool = True
+
+
+class SponsorshipPlanUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[Decimal] = None
+    duration_days: Optional[int] = None
+    priority: Optional[int] = None
+    max_categories: Optional[int] = None
+    max_locations: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class SponsorshipPlanResponse(SponsorshipPlanCreate):
+    id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VendorSponsorshipCreate(BaseModel):
+    plan_id: int
+    target_categories: Optional[List[int]] = []
+    target_locations: Optional[List[str]] = []
+    target_keywords: Optional[List[str]] = []
+
+
+class SponsorshipApproveRequest(BaseModel):
+    start_date: datetime
+    end_date: datetime
+
+
+class VendorSponsorshipResponse(BaseModel):
+    id: int
+    vendor_id: int
+    plan_id: int
+    status: str
+    target_categories: Optional[List] = []
+    target_locations: Optional[List] = []
+    target_keywords: Optional[List] = []
+    priority: int
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    click_count: int = 0
+    view_count: int = 0
+    admin_notes: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    plan: Optional[Dict] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SponsoredVendorShopInfo(BaseModel):
+    name: Optional[str] = None
+    logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
+    city: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    status: Optional[str] = None
+
+
+class SponsoredVendorPublicResponse(BaseModel):
+    vendor_id: int
+    business_name: str
+    shop: Optional[SponsoredVendorShopInfo] = None
+    sponsorship: Dict
+    is_sponsored: bool = True
+
+
+class SponsorshipAnalyticsResponse(BaseModel):
+    total_active: int
+    total_pending: int
+    total_rejected: int
+    total_expired: int
+    total_paused: int
+    aggregate_clicks: int
+    aggregate_views: int
     pending_product_approvals: int
