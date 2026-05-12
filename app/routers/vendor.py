@@ -1,16 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Body, Form, Request
+from pydantic import BaseModel
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, cast, String
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, DataError, StatementError
-from typing import List
+from typing import List, Optional, Any
 from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.storage import upload_product_image, delete_product_images, supabase_storage_enabled, StorageUploadError
 from app.core.security import require_role
-from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings, VendorFeedback
+from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings, VendorFeedback, WebsiteSettings
 from app.schemas.schemas import (
     VendorCreate, VendorUpdate, VendorResponse,
     ShopCreate, ShopUpdate, ShopResponse,
@@ -1584,4 +1585,44 @@ async def get_feedback_detail(
     if not feedback:
         raise HTTPException(status_code=404, detail="Feedback not found")
 
-    return FeedbackResponse.model_validate(feedback)
+
+# ── Site Navigation (global website settings) ──────────────────────────────
+
+class NavItemSchema(BaseModel):
+    label: str
+    href: str
+    type: str = "main"
+    children: Optional[List[dict]] = None
+
+class NavUpdatePayload(BaseModel):
+    top_navigation: List[NavItemSchema]
+
+@router.get("/website-settings/navigation")
+async def get_site_navigation(
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    nav = (settings.top_navigation if settings and settings.top_navigation else None)
+    if not nav:
+        from app.routers.public import DEFAULT_TOP_NAV
+        nav = DEFAULT_TOP_NAV
+    return {"top_navigation": nav}
+
+
+@router.put("/website-settings/navigation")
+async def update_site_navigation(
+    payload: NavUpdatePayload,
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(WebsiteSettings).where(WebsiteSettings.id == 1))
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = WebsiteSettings(id=1)
+        db.add(settings)
+    settings.top_navigation = [item.model_dump() for item in payload.top_navigation]
+    flag_modified(settings, "top_navigation")
+    await db.commit()
+    return {"ok": True, "count": len(payload.top_navigation)}

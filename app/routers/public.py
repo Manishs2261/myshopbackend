@@ -14,6 +14,22 @@ from app.schemas.schemas import WebsiteSettingsGeneralResponse, WebsiteSettingsA
 
 router = APIRouter(prefix="/public", tags=["public"])
 
+DEFAULT_TOP_NAV = [
+    {"label": "Home", "href": "/", "type": "main"},
+    {"label": "Shop", "href": "/products", "type": "main", "children": [
+        {"label": "All Products", "href": "/products"},
+        {"label": "New Arrivals",  "href": "/products?sort=newest&days=2"},
+    ]},
+    {"label": "Pages", "href": "/help-center", "type": "main", "children": [
+        {"label": "About Us", "href": "/help-center#about"},
+        {"label": "Contact",  "href": "/help-center#contact"},
+        {"label": "FAQ",      "href": "/help-center#faq"},
+    ]},
+    {"label": "Find Shop",         "href": "/shops",             "type": "promo"},
+    {"label": "View All Products", "href": "/products",          "type": "promo"},
+    {"label": "Near by Shop",      "href": "/shops?nearby=true", "type": "promo"},
+]
+
 CATEGORY_PALETTE = [
     "#f5ede0", "#fef0f8", "#f0f4fe", "#f5f0e8",
     "#eef8ee", "#ede8f8", "#fff4e8", "#fde8f0",
@@ -997,6 +1013,9 @@ async def get_public_home_settings(db: AsyncSession = Depends(get_db)):
         db.add(settings)
         await db.commit()
         await db.refresh(settings)
+    # Inject default nav when none is configured (does not persist to DB)
+    if not settings.top_navigation:
+        settings.top_navigation = DEFAULT_TOP_NAV
     return WebsiteSettingsHomeResponse.model_validate(settings)
 
 
@@ -1057,6 +1076,8 @@ async def get_public_top_navigation(db: AsyncSession = Depends(get_db)):
         db.add(settings)
         await db.commit()
         await db.refresh(settings)
+    if not settings.top_navigation:
+        settings.top_navigation = DEFAULT_TOP_NAV
     return WebsiteSettingsNavResponse.model_validate(settings)
 
 
