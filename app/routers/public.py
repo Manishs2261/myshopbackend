@@ -173,6 +173,7 @@ async def get_public_products(
     in_stock: Optional[bool] = Query(None, description="Only show in-stock products"),
     featured: Optional[bool] = Query(None, description="Only show featured products"),
     brand: Optional[str] = Query(None, description="Filter by brand name"),
+    rating_min: Optional[float] = Query(None, ge=0, le=5, description="Minimum product rating"),
     # Sort
     sort: Optional[str] = Query("newest", description="Sort: newest | price_asc | price_desc | rating | popular"),
     # Pagination
@@ -222,6 +223,9 @@ async def get_public_products(
 
     if brand:
         base_query = base_query.where(func.lower(Product.brand) == brand.lower())
+
+    if rating_min is not None:
+        base_query = base_query.where(Product.rating >= rating_min)
 
     # ── Sort ───────────────────────────────────────────────────────────────────
     if sort == "price_asc":
@@ -310,6 +314,7 @@ async def get_public_products(
             "in_stock": in_stock,
             "featured": featured,
             "brand": brand,
+            "rating_min": rating_min,
             "sort": sort,
         },
     }
