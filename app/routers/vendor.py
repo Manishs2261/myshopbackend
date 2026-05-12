@@ -26,9 +26,13 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 import json
+import base64
+import binascii
+import re
 
 router = APIRouter(prefix="/vendor", tags=["Vendor"])
 get_vendor_user = require_role("VENDOR", "ADMIN")
+DATA_IMAGE_RE = re.compile(r"^data:(image/[a-zA-Z0-9.+-]+);base64,(.+)$", re.DOTALL)
 
 
 def merge_dict(base: dict, override: dict | None) -> dict:
@@ -551,6 +555,64 @@ async def _save_product_images(vendor: Vendor, images: List[UploadFile], base_ur
     return image_urls
 
 
+async def _save_product_image_bytes(vendor: Vendor, content: bytes, filename: str, base_url: str) -> str:
+    max_image_size = 5 * 1024 * 1024
+    safe_name = Path(filename or "product-image").name
+    if len(content) > max_image_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image '{safe_name}' is too large. Maximum allowed size is 5MB.",
+        )
+
+    if supabase_storage_enabled():
+        try:
+            return await upload_product_image(content, safe_name, vendor.id)
+        except StorageUploadError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    uploads_dir = Path("uploads/products")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{vendor.id}_{uuid4().hex}_{safe_name}"
+    with open(uploads_dir / filename, "wb") as f:
+        f.write(content)
+    return f"{base_url}/uploads/products/{filename}"
+
+
+async def _materialize_data_image_urls(vendor: Vendor, images: list, base_url: str) -> list[str]:
+    image_urls = []
+    for index, image_url in enumerate(images):
+        if not isinstance(image_url, str) or not image_url.strip():
+            continue
+
+        value = image_url.strip()
+        match = DATA_IMAGE_RE.match(value)
+        if not match:
+            image_urls.append(value)
+            continue
+
+        mime_type, encoded = match.groups()
+        extension = {
+            "image/jpeg": "jpg",
+            "image/jpg": "jpg",
+            "image/png": "png",
+            "image/webp": "webp",
+            "image/gif": "gif",
+        }.get(mime_type.lower())
+        if extension is None:
+            raise HTTPException(status_code=400, detail="Unsupported image data URL type")
+
+        try:
+            content = base64.b64decode(encoded, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="Invalid image data URL") from exc
+
+        image_urls.append(
+            await _save_product_image_bytes(vendor, content, f"product-{index + 1}.{extension}", base_url)
+        )
+
+    return image_urls
+
+
 async def _generate_unique_product_slug(
     db: AsyncSession,
     name: str,
@@ -653,6 +715,9 @@ async def create_product(
     await _validate_product_payload(db, product_data)
     base_url = str(request.base_url).rstrip("/")
     image_urls = await _save_product_images(vendor, images, base_url)
+    payload_images = product_data.get("images")
+    if isinstance(payload_images, list):
+        image_urls = await _materialize_data_image_urls(vendor, payload_images, base_url) + image_urls
     unique_slug = await _generate_unique_product_slug(db, product_data["name"], vendor.id)
     
     # Extract variants before creating product
@@ -850,6 +915,10 @@ async def update_product(
     await _validate_product_payload(db, product_data)
     base_url = str(request.base_url).rstrip("/")
     new_images = await _save_product_images(vendor, images, base_url)
+    payload_images = product_data.get("images")
+    kept_images = None
+    if isinstance(payload_images, list):
+        kept_images = await _materialize_data_image_urls(vendor, payload_images, base_url)
     next_slug = product.slug
     if product_data.get("name"):
         next_slug = await _generate_unique_product_slug(db, product_data["name"], vendor.id, exclude_product_id=product.id)
@@ -869,7 +938,6 @@ async def update_product(
                 else:
                     setattr(product, field, product_data[field])
 
-        kept_images = product_data.get("images") if isinstance(product_data.get("images"), list) else None
         if new_images and kept_images is not None:
             product.images = kept_images + new_images
         elif new_images:

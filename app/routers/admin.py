@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -19,9 +19,15 @@ from slugify import slugify
 import math
 from decimal import Decimal
 from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
+import base64
+import binascii
+import re
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 get_admin = require_role("ADMIN")
+DATA_IMAGE_RE = re.compile(r"^data:(image/[a-zA-Z0-9.+-]+);base64,(.+)$", re.DOTALL)
 
 
 # ─── User Management ─────────────────────────────────────────────────────────
@@ -698,6 +704,51 @@ async def _get_or_create_website_settings(db: AsyncSession) -> WebsiteSettings:
     return settings
 
 
+def _save_settings_data_image(value: str, base_url: str) -> str:
+    match = DATA_IMAGE_RE.match(value)
+    if not match:
+        return value
+
+    mime_type, encoded = match.groups()
+    extension = {
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "image/gif": "gif",
+        "image/x-icon": "ico",
+        "image/vnd.microsoft.icon": "ico",
+    }.get(mime_type.lower())
+    if extension is None:
+        raise HTTPException(status_code=400, detail="Unsupported image data URL type")
+
+    try:
+        content = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid image data URL") from exc
+
+    max_image_size = 5 * 1024 * 1024
+    if len(content) > max_image_size:
+        raise HTTPException(status_code=400, detail="Image too large. Maximum allowed size is 5MB.")
+
+    uploads_dir = Path("uploads/settings")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}.{extension}"
+    with open(uploads_dir / filename, "wb") as f:
+        f.write(content)
+    return f"{base_url}/uploads/settings/{filename}"
+
+
+def _materialize_settings_images(value, base_url: str):
+    if isinstance(value, str):
+        return _save_settings_data_image(value.strip(), base_url) if value.strip().startswith("data:image/") else value
+    if isinstance(value, list):
+        return [_materialize_settings_images(item, base_url) for item in value]
+    if isinstance(value, dict):
+        return {key: _materialize_settings_images(item, base_url) for key, item in value.items()}
+    return value
+
+
 @router.get("/website-settings", response_model=WebsiteSettingsResponse)
 async def get_website_settings(
     current_user: User = Depends(get_admin),
@@ -718,13 +769,15 @@ async def get_general_settings(
 
 @router.put("/website-settings", response_model=WebsiteSettingsResponse)
 async def update_website_settings(
+    request: Request,
     payload: WebsiteSettingsUpdate,
     current_user: User = Depends(get_admin),
     db: AsyncSession = Depends(get_db),
 ):
     settings = await _get_or_create_website_settings(db)
+    base_url = str(request.base_url).rstrip("/")
     for field, value in payload.model_dump(exclude_none=True).items():
-        setattr(settings, field, value)
+        setattr(settings, field, _materialize_settings_images(value, base_url))
     await db.commit()
     await db.refresh(settings)
     return WebsiteSettingsResponse.model_validate(settings)

@@ -83,12 +83,26 @@ app.add_middleware(
 @app.middleware("http")
 async def add_process_time(request: Request, call_next):
     start = time.time()
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        log.error(f"Unhandled exception: {exc}", exc_info=True)
+        origin = request.headers.get("origin", "")
+        response = JSONResponse(status_code=500, content={"detail": str(exc)})
+        if origin in settings.cors_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["X-Process-Time"] = str(round(time.time() - start, 4))
     return response
 
 
 # ─── Exception Handlers ──────────────────────────────────────────────────────
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    log.error(f"Unhandled exception on {request.url}: {exc}", exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": str(exc), "type": type(exc).__name__})
+
 
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
@@ -125,7 +139,7 @@ async def unicode_decode_error_handler(request: Request, exc: UnicodeDecodeError
 # ─── Include Routers ─────────────────────────────────────────────────────────
 
 # Ensure uploads directory and subdirectories exist before mounting
-for _subdir in ("uploads", "uploads/products", "uploads/logos", "uploads/banners", "uploads/gallery"):
+for _subdir in ("uploads", "uploads/products", "uploads/logos", "uploads/banners", "uploads/gallery", "uploads/settings"):
     Path(_subdir).mkdir(parents=True, exist_ok=True)
 
 # Mount static files
