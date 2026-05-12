@@ -172,7 +172,9 @@ async def list_products_admin(
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Product)
-    if status:
+    if status == "sponsor_requests":
+        query = query.where(Product.sponsor_request_status == "pending")
+    elif status:
         query = query.where(Product.status == status)
     query = query.order_by(Product.created_at.desc())
 
@@ -252,6 +254,38 @@ async def feature_product(
     product.is_featured = bool(payload.get("is_featured", False))
     await db.commit()
     return {"message": "Product updated", "product_id": product_id, "is_featured": product.is_featured}
+
+
+@router.put("/products/{product_id}/sponsor", response_model=dict)
+async def sponsor_product(
+    product_id: int,
+    payload: dict,
+    current_user: User = Depends(get_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    action = payload.get("action")
+    if action == "approve":
+        product.is_sponsored = True
+        product.sponsor_request_status = "approved"
+    elif action == "reject":
+        product.is_sponsored = False
+        product.sponsor_request_status = "rejected"
+    else:
+        product.is_sponsored = bool(payload.get("is_sponsored", False))
+        product.sponsor_request_status = "approved" if product.is_sponsored else "none"
+
+    await db.commit()
+    return {
+        "message": "Product sponsor status updated",
+        "product_id": product_id,
+        "is_sponsored": product.is_sponsored,
+        "sponsor_request_status": product.sponsor_request_status,
+    }
 
 
 @router.post("/products", response_model=ProductResponse, status_code=201)

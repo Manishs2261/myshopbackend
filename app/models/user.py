@@ -222,6 +222,8 @@ class Product(Base):
     tags = Column(JSON)  # list of strings
     specifications = Column(JSON)  # {key: value}
     is_featured = Column(Boolean, default=False)
+    is_sponsored = Column(Boolean, default=False)
+    sponsor_request_status = Column(String(20), default="none")  # none | pending | approved | rejected
     view_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

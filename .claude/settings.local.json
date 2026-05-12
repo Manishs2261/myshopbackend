@@ -9,7 +9,9 @@
       "Bash(Get-Content \"e:\\\\where my shop\\\\myshop-page\\\\src\\\\components\\\\layout\\\\Header.css\")",
       "Bash(Select-Object -Last 30)",
       "Bash(Get-ChildItem -Path \"e:\\\\where my shop\\\\myshop-page\" -Recurse -Filter \"*slider*\" -ErrorAction SilentlyContinue)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(ls -Path \"e:\\\\where my shop\\\\myshop-page\" | Where-Object {$_.PSIsContainer} | Select-Object Name)",
+      "PowerShell(ls -Path \"e:\\\\where my shop\\\\myshopadmin-panel\" | Where-Object {$_.PSIsContainer} | Select-Object Name)"
     ]
   }
 }

@@ -645,6 +645,8 @@ class ProductResponse(BaseModel):
     tags: Optional[List[str]]
     specifications: Optional[Dict[str, Any]]
     is_featured: bool
+    is_sponsored: bool = False
+    sponsor_request_status: str = "none"
     view_count: int
     variants: List[ProductVariantResponse] = []
     created_at: Optional[datetime]
@@ -667,6 +669,8 @@ class ProductListResponse(BaseModel):
     rating: float
     images: Optional[List[str]]
     is_featured: bool
+    is_sponsored: bool = False
+    sponsor_request_status: str = "none"
     updated_at: Optional[datetime]
 
     class Config:

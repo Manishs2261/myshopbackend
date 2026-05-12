@@ -294,6 +294,8 @@ async def get_public_products(
             "stock": p.stock,
             "in_stock": (p.stock or 0) > 0,
             "is_featured": p.is_featured or False,
+            "is_sponsored": p.is_sponsored or False,
+            "sponsor_request_status": p.sponsor_request_status or "none",
             "view_count": p.view_count or 0,
             "variants": [
                 {
@@ -334,6 +336,51 @@ async def get_public_products(
             "sort": sort,
         },
     }
+
+
+@router.get("/products/sponsored")
+async def get_sponsored_products(
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
+        select(Product)
+        .options(selectinload(Product.vendor).selectinload(Vendor.shop), selectinload(Product.category), selectinload(Product.variants))
+        .where(Product.is_sponsored == True, Product.status == "approved")
+        .order_by(Product.updated_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    products = result.scalars().all()
+
+    formatted = []
+    for p in products:
+        discounted_price = float(p.price)
+        if p.discount_percentage and p.discount_percentage > 0:
+            discounted_price = round(float(p.price) * (1 - p.discount_percentage / 100), 2)
+        shop = p.vendor.shop if p.vendor else None
+        formatted.append({
+            "id": p.id,
+            "name": p.name,
+            "slug": p.slug,
+            "brand": p.brand or "",
+            "price": float(p.price),
+            "original_price": float(p.original_price) if p.original_price else None,
+            "discount_percentage": p.discount_percentage,
+            "discounted_price": discounted_price,
+            "images": p.images or [],
+            "tags": p.tags or [],
+            "category_name": p.category.name if p.category else "Uncategorized",
+            "rating": p.rating or 0,
+            "review_count": p.review_count or 0,
+            "stock": p.stock,
+            "is_featured": p.is_featured or False,
+            "is_sponsored": True,
+            "sponsor_request_status": p.sponsor_request_status or "approved",
+            **_shop_snapshot(p.vendor, shop),
+        })
+
+    return {"products": formatted}
 
 
 @router.get("/products/suggestions")

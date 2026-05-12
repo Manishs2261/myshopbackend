@@ -663,6 +663,8 @@ def _serialize_product(product: Product) -> dict:
         "tags": product.tags or [],
         "specifications": product.specifications or {},
         "is_featured": product.is_featured,
+        "is_sponsored": product.is_sponsored or False,
+        "sponsor_request_status": product.sponsor_request_status or "none",
         "view_count": product.view_count,
         "variants": [
             {
@@ -998,6 +1000,28 @@ async def delete_product(
     product.updated_at = datetime.utcnow()
     await db.commit()
     return {"message": "Product deleted"}
+
+
+@router.post("/products/{product_id}/sponsor-request", response_model=dict)
+async def request_sponsorship(
+    product_id: int,
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+    result = await db.execute(
+        select(Product).where(Product.id == product_id, Product.vendor_id == vendor.id)
+    )
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if product.sponsor_request_status == "pending":
+        raise HTTPException(status_code=400, detail="Sponsorship request already pending")
+    if product.sponsor_request_status == "approved" and product.is_sponsored:
+        raise HTTPException(status_code=400, detail="Product is already sponsored")
+    product.sponsor_request_status = "pending"
+    await db.commit()
+    return {"message": "Sponsorship request submitted", "product_id": product_id}
 
 
 @router.post("/products/bulk-delete", response_model=dict)
