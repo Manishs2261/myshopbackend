@@ -26,7 +26,7 @@ SHARED:
 
 import secrets
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -44,6 +44,7 @@ from app.models.user import User, Vendor
 from app.schemas.schemas import (
     FirebaseLoginRequest, TokenResponse, RefreshTokenRequest,
     CustomerRegisterRequest, CustomerLoginRequest,
+    CustomerRegisterCompleteRequest,
     VendorRegisterRequest, VendorLoginRequest,
     SendOTPRequest, SendEmailOTPRequest, VerifyOTPRequest, FirebaseVerifyPhoneRequest,
     ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest,
@@ -53,6 +54,10 @@ from app.services.mail import mail_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Temporary store: email → {name, phone, hashed_password, otp, expires_at}
+# Entries are written by /register/customer/initiate and consumed by /register/customer/complete.
+_pending_registrations: dict = {}
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -128,23 +133,26 @@ async def register_customer(
     if result.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Email already registered. Please login.")
 
-    result = await db.execute(select(User).where(User.phone == payload.phone))
-    user = result.scalar_one_or_none()
-    if user:
-        if not can_claim_phone_placeholder(user):
-            raise HTTPException(status_code=409, detail="Phone number already registered.")
+    user = None
+    if payload.phone:
+        result = await db.execute(select(User).where(User.phone == payload.phone))
+        existing = result.scalar_one_or_none()
+        if existing:
+            if not can_claim_phone_placeholder(existing):
+                raise HTTPException(status_code=409, detail="Phone number already registered.")
+            user = existing
+            user.name = payload.name
+            user.email = payload.email
+            user.hashed_password = hash_password(payload.password)
+            user.role = "USER"
+            user.status = user.status or "active"
+            user.is_email_verified = False
 
-        user.name = payload.name
-        user.email = payload.email
-        user.hashed_password = hash_password(payload.password)
-        user.role = "USER"
-        user.status = user.status or "active"
-        user.is_email_verified = False
-    else:
+    if user is None:
         user = User(
             name=payload.name,
             email=payload.email,
-            phone=payload.phone,
+            phone=payload.phone or None,
             hashed_password=hash_password(payload.password),
             role="USER",
             status="active",
@@ -152,6 +160,130 @@ async def register_customer(
             is_phone_verified=False,
         )
         db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return make_tokens(user)
+
+
+@router.post("/register/customer/initiate", response_model=dict, status_code=200,
+             summary="Initiate Customer Registration (send OTP)")
+async def initiate_customer_registration(
+    payload: CustomerRegisterRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Step 1 of registration: validate details, send OTP, hold data pending.
+    **No DB record is created yet.**
+
+    **Body:**
+    ```json
+    {
+      "name": "Rahul Sharma",
+      "email": "rahul@gmail.com",
+      "phone": "9876543210",
+      "password": "rahul123"
+    }
+    ```
+    Returns `{message, email, expires_in_seconds}`. Call `/register/customer/complete` with the OTP.
+    """
+    result = await db.execute(select(User).where(User.email == payload.email))
+    existing = result.scalar_one_or_none()
+    if existing and existing.is_email_verified:
+        raise HTTPException(status_code=409, detail="Email already registered. Please login.")
+
+    if payload.phone:
+        result = await db.execute(select(User).where(User.phone == payload.phone))
+        phone_user = result.scalar_one_or_none()
+        if phone_user and not can_claim_phone_placeholder(phone_user):
+            raise HTTPException(status_code=409, detail="Phone number already registered.")
+
+    otp = generate_otp(6)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    _pending_registrations[payload.email] = {
+        "name": payload.name,
+        "phone": payload.phone,
+        "hashed_password": hash_password(payload.password),
+        "otp": otp,
+        "expires_at": expires,
+    }
+
+    background_tasks.add_task(mail_service.send_otp_email, payload.email, otp)
+
+    masked = payload.email[:3] + "***@" + payload.email.split("@")[-1]
+    return {
+        "message": f"OTP sent to {masked}",
+        "email": payload.email,
+        "expires_in_seconds": 600,
+    }
+
+
+@router.post("/register/customer/complete", response_model=TokenResponse, status_code=201,
+             summary="Complete Customer Registration (verify OTP)")
+async def complete_customer_registration(
+    payload: CustomerRegisterCompleteRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Step 2 of registration: verify OTP and create the user account.
+
+    **Body:**
+    ```json
+    {
+      "email": "rahul@gmail.com",
+      "otp": "847261"
+    }
+    ```
+    Returns JWT tokens — user is registered and logged in.
+    """
+    pending = _pending_registrations.get(payload.email)
+    if not pending:
+        raise HTTPException(status_code=400, detail="No pending registration. Please start over.")
+
+    expires = pending["expires_at"]
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expires:
+        _pending_registrations.pop(payload.email, None)
+        raise HTTPException(status_code=400, detail="OTP expired. Please start over.")
+
+    if pending["otp"] != payload.otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP. Try again.")
+
+    _pending_registrations.pop(payload.email, None)
+
+    # Re-check uniqueness (race condition guard)
+    result = await db.execute(select(User).where(User.email == payload.email))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Email already registered. Please login.")
+
+    user = None
+    if pending["phone"]:
+        result = await db.execute(select(User).where(User.phone == pending["phone"]))
+        existing = result.scalar_one_or_none()
+        if existing and can_claim_phone_placeholder(existing):
+            user = existing
+            user.name = pending["name"]
+            user.email = payload.email
+            user.hashed_password = pending["hashed_password"]
+            user.role = "USER"
+            user.status = user.status or "active"
+            user.is_email_verified = True
+
+    if user is None:
+        user = User(
+            name=pending["name"],
+            email=payload.email,
+            phone=pending["phone"],
+            hashed_password=pending["hashed_password"],
+            role="USER",
+            status="active",
+            is_email_verified=True,
+            is_phone_verified=False,
+        )
+        db.add(user)
+
     await db.commit()
     await db.refresh(user)
     return make_tokens(user)
@@ -336,7 +468,7 @@ async def send_otp(
     ```
     """
     otp = generate_otp(6)
-    expires = datetime.utcnow() + timedelta(minutes=10)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=10)
 
     result = await db.execute(select(User).where(User.phone == payload.phone))
     user = result.scalar_one_or_none()
@@ -395,13 +527,8 @@ async def verify_otp(
 
     # Check expiry
     if user.otp_expires_at:
-        expires = user.otp_expires_at
-        if hasattr(expires, 'tzinfo') and expires.tzinfo:
-            from datetime import timezone
-            now = datetime.now(timezone.utc)
-        else:
-            now = datetime.utcnow()
-        if now > expires:
+        expires = user.otp_expires_at.replace(tzinfo=timezone.utc) if user.otp_expires_at.tzinfo is None else user.otp_expires_at
+        if datetime.now(timezone.utc) > expires:
             raise HTTPException(status_code=400, detail="OTP expired. Request a new one.")
 
     if user.otp_code != payload.otp:
@@ -537,7 +664,7 @@ async def forgot_password(
     if user and user.hashed_password:
         token = secrets.token_urlsafe(32)
         user.password_reset_token = token
-        user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)
         await db.commit()
         background_tasks.add_task(send_reset_email, payload.email, token)
 
@@ -570,8 +697,8 @@ async def reset_password(
 
     expires = user.password_reset_expires
     if expires:
-        exp = expires.replace(tzinfo=None) if hasattr(expires, 'tzinfo') and expires.tzinfo else expires
-        if datetime.utcnow() > exp:
+        exp = expires.replace(tzinfo=timezone.utc) if expires.tzinfo is None else expires
+        if datetime.now(timezone.utc) > exp:
             raise HTTPException(status_code=400, detail="Token expired. Request a new reset link.")
 
     user.hashed_password = hash_password(payload.new_password)
@@ -632,7 +759,7 @@ async def send_email_verification_otp(
         raise HTTPException(status_code=400, detail="No email address provided")
         
     otp = generate_otp(6)
-    expires = datetime.utcnow() + timedelta(minutes=10)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=10)
     current_user.otp_code = otp
     current_user.otp_expires_at = expires
     # Temporarily store the email being verified if it's different
@@ -656,13 +783,8 @@ async def confirm_email_verification(
 
     # Check expiry
     if current_user.otp_expires_at:
-        expires = current_user.otp_expires_at
-        if hasattr(expires, 'tzinfo') and expires.tzinfo:
-            from datetime import timezone
-            now = datetime.now(timezone.utc)
-        else:
-            now = datetime.utcnow()
-        if now > expires:
+        expires = current_user.otp_expires_at.replace(tzinfo=timezone.utc) if current_user.otp_expires_at.tzinfo is None else current_user.otp_expires_at
+        if datetime.now(timezone.utc) > expires:
             raise HTTPException(status_code=400, detail="OTP expired. Request a new one.")
 
     if current_user.otp_code != otp:
@@ -689,7 +811,7 @@ async def send_phone_verification_otp(
     if not current_user.phone:
         raise HTTPException(status_code=400, detail="No phone number on account")
     otp = generate_otp(6)
-    expires = datetime.utcnow() + timedelta(minutes=10)
+    expires = datetime.now(timezone.utc) + timedelta(minutes=10)
     current_user.otp_code = otp
     current_user.otp_expires_at = expires
     await db.commit()
@@ -706,7 +828,7 @@ async def confirm_phone_verification(
     otp = payload.get("otp", "")
     if not current_user.otp_code:
         raise HTTPException(status_code=400, detail="No OTP found. Request a new one.")
-    if datetime.utcnow() > current_user.otp_expires_at:
+    if datetime.now(timezone.utc) > current_user.otp_expires_at.replace(tzinfo=timezone.utc) if current_user.otp_expires_at.tzinfo is None else current_user.otp_expires_at:
         raise HTTPException(status_code=400, detail="OTP expired. Request a new one.")
     if current_user.otp_code != otp:
         raise HTTPException(status_code=400, detail="Invalid OTP")

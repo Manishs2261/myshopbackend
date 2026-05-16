@@ -29,7 +29,7 @@ async def update_my_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    for field, value in payload.model_dump(exclude_none=True).items():
+    for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(current_user, field, value)
     await db.commit()
     await db.refresh(current_user)

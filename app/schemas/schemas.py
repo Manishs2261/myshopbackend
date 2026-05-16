@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 from typing import Optional, List, Any, Dict
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 import re
 
@@ -33,12 +33,14 @@ class RefreshTokenRequest(BaseModel):
 class CustomerRegisterRequest(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
-    phone: str = Field(..., min_length=10, max_length=15)
+    phone: Optional[str] = None
     password: str = Field(..., min_length=6, max_length=100)
 
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v):
+        if not v or not v.strip():
+            return None
         if not re.match(r"^[6-9]\d{9}$", v.replace("+91", "").replace(" ", "")):
             raise ValueError("Enter a valid 10-digit Indian mobile number")
         return v
@@ -126,6 +128,11 @@ class VerifyOTPRequest(BaseModel):
     role: Optional[str] = "USER"  # USER or VENDOR
 
 
+class CustomerRegisterCompleteRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6)
+
+
 # ─── Password Management ────────────────────────────────────────────────────
 
 class ForgotPasswordRequest(BaseModel):
@@ -163,6 +170,13 @@ class UserBase(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     avatar_url: Optional[str] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    alternate_phone: Optional[str] = None
+    pincode: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    language: Optional[str] = None
 
 
 class UserUpdate(UserBase):
@@ -172,15 +186,22 @@ class UserUpdate(UserBase):
 class UserResponse(BaseModel):
     id: int
     firebase_uid: Optional[str] = None
-    name: Optional[str]
-    email: Optional[str]
-    phone: Optional[str]
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
     role: str
     status: str
-    avatar_url: Optional[str]
+    avatar_url: Optional[str] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    alternate_phone: Optional[str] = None
+    pincode: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    language: Optional[str] = None
     is_email_verified: Optional[bool] = False
     is_phone_verified: Optional[bool] = False
-    created_at: Optional[datetime]
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

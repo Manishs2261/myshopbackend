@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Text, Float, Boolean, DateTime,
+    Column, Integer, String, Text, Float, Boolean, DateTime, Date,
     ForeignKey, Enum, JSON, BigInteger, Numeric, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
@@ -119,6 +119,13 @@ class User(Base):
     role = Column(String(20), default=UserRole.USER)
     status = Column(String(20), default=UserStatus.ACTIVE)
     avatar_url = Column(String(500))
+    gender = Column(String(20), nullable=True)
+    date_of_birth = Column(Date, nullable=True)
+    alternate_phone = Column(String(20), nullable=True)
+    pincode = Column(String(10), nullable=True)
+    city = Column(String(100), nullable=True)
+    state = Column(String(100), nullable=True)
+    language = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
