@@ -42,6 +42,7 @@ async def create_tables():
             "ALTER TABLE marketplace_settings ADD COLUMN IF NOT EXISTS storefront_published JSON",
             "ALTER TABLE marketplace_settings ADD COLUMN IF NOT EXISTS storefront_status VARCHAR",
             "ALTER TABLE marketplace_settings ADD COLUMN IF NOT EXISTS published_at TIMESTAMP",
+            "ALTER TABLE reviews ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE",
         ]
         for sql in migrations:
             try:

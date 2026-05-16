@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, 
 from pydantic import BaseModel
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, cast, String
+from sqlalchemy import asc, desc, select, func, or_, cast, String
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.exc import IntegrityError, DataError, StatementError
@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.storage import upload_product_image, delete_product_images, supabase_storage_enabled, StorageUploadError
 from app.core.security import require_role
-from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings, VendorFeedback, WebsiteSettings
+from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings, VendorFeedback, WebsiteSettings, Review
 from app.schemas.schemas import (
     VendorCreate, VendorUpdate, VendorResponse,
     ShopCreate, ShopUpdate, ShopResponse,
@@ -1436,6 +1436,113 @@ async def get_marketplace_settings(
         sync_legacy_marketplace_fields(settings, settings.storefront_draft)
         await db.commit()
         await db.refresh(settings)
+
+
+# ── Vendor Review Endpoints ─────────────────────────────────────────────────
+
+_REVIEW_SORT_MAP = {
+    "latest": desc(Review.created_at),
+    "highest": desc(Review.rating),
+    "lowest": asc(Review.rating),
+}
+
+
+@router.get("/reviews")
+async def vendor_list_reviews(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    search: Optional[str] = Query(default=None),
+    rating: Optional[int] = Query(default=None, ge=1, le=5),
+    sort: str = Query(default="latest", pattern="^(latest|highest|lowest)$"),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+
+    query = (
+        select(Review, Product, User)
+        .join(Product, Review.product_id == Product.id)
+        .join(User, Review.user_id == User.id)
+        .where(Product.vendor_id == vendor.id)
+    )
+
+    if rating is not None:
+        query = query.where(Review.rating == rating)
+
+    if search:
+        query = query.where(
+            or_(
+                Product.name.ilike(f"%{search}%"),
+                User.name.ilike(f"%{search}%"),
+            )
+        )
+
+    count_result = await db.execute(
+        select(func.count()).select_from(query.subquery())
+    )
+    total = count_result.scalar() or 0
+
+    rows = (
+        await db.execute(
+            query.order_by(_REVIEW_SORT_MAP[sort])
+            .offset((page - 1) * limit)
+            .limit(limit)
+        )
+    ).all()
+
+    items = []
+    for review, product, user in rows:
+        first_image = (product.images or [None])[0]
+        items.append({
+            "id": str(review.id),
+            "product_id": str(review.product_id),
+            "product_name": product.name,
+            "product_image": first_image,
+            "reviewer_name": user.name or user.email or "Customer",
+            "reviewer_avatar": user.avatar_url,
+            "rating": review.rating,
+            "comment": review.comment,
+            "is_verified_purchase": review.is_verified_purchase,
+            "created_at": review.created_at.isoformat() if review.created_at else None,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pages": math.ceil(total / limit) if total else 1,
+    }
+
+
+@router.get("/reviews/stats")
+async def vendor_review_stats(
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+
+    agg_result = await db.execute(
+        select(func.avg(Review.rating), func.count(Review.id))
+        .join(Product, Review.product_id == Product.id)
+        .where(Product.vendor_id == vendor.id)
+    )
+    avg_rating, total_reviews = agg_result.one()
+
+    dist_result = await db.execute(
+        select(Review.rating, func.count(Review.id))
+        .join(Product, Review.product_id == Product.id)
+        .where(Product.vendor_id == vendor.id)
+        .group_by(Review.rating)
+    )
+    breakdown = {str(row[0]): row[1] for row in dist_result}
+    for star in ("1", "2", "3", "4", "5"):
+        breakdown.setdefault(star, 0)
+
+    return {
+        "average_rating": round(float(avg_rating or 0), 1),
+        "total_reviews": total_reviews or 0,
+        "breakdown": breakdown,
+    }
 
     return serialize_editor_state(settings, vendor, shop, products)
 

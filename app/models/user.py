@@ -384,6 +384,7 @@ class Review(Base):
     images = Column(JSON)
     is_verified_purchase = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (UniqueConstraint("product_id", "user_id"),)
 

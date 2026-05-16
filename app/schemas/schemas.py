@@ -823,6 +823,12 @@ class ReviewCreate(BaseModel):
     images: Optional[List[str]]
 
 
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    comment: Optional[str] = None
+    images: Optional[List[str]] = None
+
+
 class ReviewResponse(BaseModel):
     id: int
     product_id: int
@@ -832,6 +838,7 @@ class ReviewResponse(BaseModel):
     images: Optional[List[str]]
     is_verified_purchase: bool
     created_at: datetime
+    updated_at: Optional[datetime] = None
     user: Optional[UserResponse]
 
     class Config:
