@@ -25,7 +25,7 @@ from app.core.firebase import init_firebase
 log.info("Core modules loaded. Loading routers...")
 
 # Import all routers
-from app.routers import auth, user, vendor, admin, cart, orders, payments, analytics, reviews, coupons, public, sponsorship
+from app.routers import auth, user, vendor, admin, cart, orders, payments, analytics, reviews, coupons, public, sponsorship, vendor_reviews
 import app.models.sponsorship  # noqa: F401 — registers tables with Base metadata
 
 log.info("All routers loaded.")
@@ -140,7 +140,7 @@ async def unicode_decode_error_handler(request: Request, exc: UnicodeDecodeError
 # ─── Include Routers ─────────────────────────────────────────────────────────
 
 # Ensure uploads directory and subdirectories exist before mounting
-for _subdir in ("uploads", "uploads/products", "uploads/logos", "uploads/banners", "uploads/gallery", "uploads/settings"):
+for _subdir in ("uploads", "uploads/products", "uploads/logos", "uploads/banners", "uploads/gallery", "uploads/settings", "uploads/reviews/vendor"):
     Path(_subdir).mkdir(parents=True, exist_ok=True)
 
 # Mount static files
@@ -158,6 +158,7 @@ app.include_router(coupons.router)
 app.include_router(vendor.router)
 app.include_router(admin.router)
 app.include_router(sponsorship.router)
+app.include_router(vendor_reviews.router)
 
 
 def frontend_file(filename: str) -> str:

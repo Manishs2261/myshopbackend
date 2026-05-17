@@ -845,6 +845,53 @@ class ReviewResponse(BaseModel):
         from_attributes = True
 
 
+# ─── Vendor Review ──────────────────────────────────────────────────────────
+
+class VendorReviewCreate(BaseModel):
+    vendor_id: int
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = None
+    images: Optional[List[str]] = None
+
+
+class VendorReviewUpdate(BaseModel):
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    comment: Optional[str] = None
+    images: Optional[List[str]] = None
+
+
+class VendorReviewResponse(BaseModel):
+    id: int
+    vendor_id: int
+    user_id: int
+    rating: int
+    comment: Optional[str]
+    images: Optional[List[str]]
+    helpful_count: int
+    report_count: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    user: Optional[UserResponse] = None
+    has_liked: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+
+class VendorRatingSummary(BaseModel):
+    vendor_id: int
+    average_rating: float
+    total_reviews: int
+    five_star: int
+    four_star: int
+    three_star: int
+    two_star: int
+    one_star: int
+
+    class Config:
+        from_attributes = True
+
+
 # ─── Coupon ─────────────────────────────────────────────────────────────────
 
 class CouponCreate(BaseModel):

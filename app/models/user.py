@@ -134,6 +134,7 @@ class User(Base):
     cart = relationship("Cart", back_populates="user", uselist=False)
     wishlist = relationship("Wishlist", back_populates="user")
     events = relationship("Event", back_populates="user")
+    vendor_reviews = relationship("VendorReview", back_populates="user")
 
 
 class Vendor(Base):
@@ -161,6 +162,8 @@ class Vendor(Base):
     marketplace_settings = relationship("MarketplaceSettings", back_populates="vendor", uselist=False)
     feedbacks = relationship("VendorFeedback", back_populates="vendor")
     sponsorships = relationship("VendorSponsorship", back_populates="vendor")
+    reviews = relationship("VendorReview", back_populates="vendor")
+    rating_summary = relationship("VendorRating", back_populates="vendor", uselist=False)
 
 
 class Shop(Base):
@@ -390,6 +393,56 @@ class Review(Base):
 
     product = relationship("Product", back_populates="reviews")
     user = relationship("User")
+
+
+# ─── Vendor Review ──────────────────────────────────────────────────────────
+
+class VendorReview(Base):
+    __tablename__ = "vendor_reviews"
+    __table_args__ = (UniqueConstraint("vendor_id", "user_id", name="uq_vendor_review"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    rating = Column(Integer, nullable=False)
+    comment = Column(Text, nullable=True)
+    images = Column(JSON, nullable=True)
+    helpful_count = Column(Integer, default=0)
+    report_count = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    vendor = relationship("Vendor", back_populates="reviews")
+    user = relationship("User", back_populates="vendor_reviews")
+    helpful_by = relationship("VendorReviewHelpful", back_populates="review", cascade="all, delete-orphan")
+
+
+class VendorRating(Base):
+    __tablename__ = "vendor_ratings"
+
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), primary_key=True)
+    average_rating = Column(Float, default=0.0)
+    total_reviews = Column(Integer, default=0)
+    five_star = Column(Integer, default=0)
+    four_star = Column(Integer, default=0)
+    three_star = Column(Integer, default=0)
+    two_star = Column(Integer, default=0)
+    one_star = Column(Integer, default=0)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    vendor = relationship("Vendor", back_populates="rating_summary")
+
+
+class VendorReviewHelpful(Base):
+    __tablename__ = "vendor_review_helpfuls"
+    __table_args__ = (UniqueConstraint("review_id", "user_id", name="uq_vendor_review_helpful"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    review_id = Column(Integer, ForeignKey("vendor_reviews.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    review = relationship("VendorReview", back_populates="helpful_by")
 
 
 class Coupon(Base):

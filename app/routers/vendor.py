@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.core.storage import upload_product_image, delete_product_images, supabase_storage_enabled, StorageUploadError
 from app.core.security import require_role
-from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings, VendorFeedback, WebsiteSettings, Review
+from app.models.user import User, Vendor, Shop, Product, ProductVariant, Order, OrderItem, Payout, Category, MarketplaceSettings, VendorFeedback, WebsiteSettings, Review, VendorReview, VendorRating
 from app.schemas.schemas import (
     VendorCreate, VendorUpdate, VendorResponse,
     ShopCreate, ShopUpdate, ShopResponse,
@@ -1544,7 +1544,118 @@ async def vendor_review_stats(
         "breakdown": breakdown,
     }
 
-    return serialize_editor_state(settings, vendor, shop, products)
+
+# ── Vendor Shop-Review Endpoints ─────────────────────────────────────────────
+
+_SHOP_REVIEW_SORT_MAP = {
+    "latest": desc(VendorReview.created_at),
+    "highest": desc(VendorReview.rating),
+    "lowest": asc(VendorReview.rating),
+}
+
+
+@router.get("/shop-reviews")
+async def vendor_list_shop_reviews(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    search: Optional[str] = Query(default=None),
+    rating: Optional[int] = Query(default=None, ge=1, le=5),
+    sort: str = Query(default="latest", pattern="^(latest|highest|lowest)$"),
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+
+    query = (
+        select(VendorReview, User)
+        .join(User, VendorReview.user_id == User.id)
+        .where(VendorReview.vendor_id == vendor.id)
+    )
+
+    if rating is not None:
+        query = query.where(VendorReview.rating == rating)
+    if search:
+        query = query.where(User.name.ilike(f"%{search}%"))
+
+    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = count_result.scalar() or 0
+
+    rows = (
+        await db.execute(
+            query.order_by(_SHOP_REVIEW_SORT_MAP[sort])
+            .offset((page - 1) * limit)
+            .limit(limit)
+        )
+    ).all()
+
+    items = []
+    for review, user in rows:
+        items.append({
+            "id": review.id,
+            "vendor_id": review.vendor_id,
+            "user_id": review.user_id,
+            "reviewer_name": user.name or user.email or "Customer",
+            "reviewer_avatar": user.avatar_url,
+            "rating": review.rating,
+            "comment": review.comment,
+            "images": review.images or [],
+            "helpful_count": review.helpful_count,
+            "report_count": review.report_count,
+            "created_at": review.created_at.isoformat() if review.created_at else None,
+            "updated_at": review.updated_at.isoformat() if review.updated_at else None,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pages": math.ceil(total / limit) if total else 1,
+    }
+
+
+@router.get("/shop-reviews/stats")
+async def vendor_shop_review_stats(
+    current_user: User = Depends(get_vendor_user),
+    db: AsyncSession = Depends(get_db),
+):
+    vendor = await get_vendor(current_user, db)
+
+    rating_row = await db.get(VendorRating, vendor.id)
+    if not rating_row:
+        summary = {
+            "average_rating": 0.0, "total_reviews": 0,
+            "five_star": 0, "four_star": 0, "three_star": 0, "two_star": 0, "one_star": 0,
+        }
+    else:
+        summary = {
+            "average_rating": round(rating_row.average_rating or 0.0, 1),
+            "total_reviews": rating_row.total_reviews or 0,
+            "five_star": rating_row.five_star or 0,
+            "four_star": rating_row.four_star or 0,
+            "three_star": rating_row.three_star or 0,
+            "two_star": rating_row.two_star or 0,
+            "one_star": rating_row.one_star or 0,
+        }
+
+    recent_rows = await db.execute(
+        select(VendorReview, User)
+        .join(User, VendorReview.user_id == User.id)
+        .where(VendorReview.vendor_id == vendor.id)
+        .order_by(desc(VendorReview.created_at))
+        .limit(5)
+    )
+    recent = []
+    for review, user in recent_rows.all():
+        recent.append({
+            "id": review.id,
+            "reviewer_name": user.name or user.email or "Customer",
+            "reviewer_avatar": user.avatar_url,
+            "rating": review.rating,
+            "comment": review.comment,
+            "created_at": review.created_at.isoformat() if review.created_at else None,
+        })
+
+    return {**summary, "recent_reviews": recent}
 
 
 @router.put("/marketplace-settings")
