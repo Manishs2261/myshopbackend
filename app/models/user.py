@@ -187,6 +187,8 @@ class Shop(Base):
     opening_time = Column(String(10))
     closing_time = Column(String(10))
     working_days = Column(JSON)  # ["Mon","Tue",...]
+    contact_phone = Column(String(20))
+    whatsapp_number = Column(String(20))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

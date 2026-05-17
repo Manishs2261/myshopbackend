@@ -474,7 +474,7 @@ async def delete_category(
 
 # ─── Analytics ───────────────────────────────────────────────────────────────
 
-@router.get("/analytics", response_model=AdminAnalytics)
+@router.get("/analytics")
 async def system_analytics(
     current_user: User = Depends(get_admin),
     db: AsyncSession = Depends(get_db),
@@ -521,17 +521,60 @@ async def system_analytics(
         select(func.count(Product.id)).where(Product.status == "pending")
     )).scalar()
 
-    return AdminAnalytics(
-        total_users=total_users,
-        total_vendors=total_vendors,
-        total_products=total_products,
-        total_orders=total_orders,
-        revenue=revenue,
-        top_products=top_products,
-        cart_abandonment_rate=cart_abandonment_rate,
-        pending_vendor_approvals=pending_vendor_approvals,
-        pending_product_approvals=pending_product_approvals,
-    )
+    # Platform activity from real tracking tables (best-effort — tables may not exist yet)
+    total_events_today = 0
+    top_keywords_today = []
+    trending_products_today = []
+    try:
+        from app.models.analytics import ProductView, SearchLog
+        from datetime import date
+        today_start = datetime.combine(date.today(), datetime.min.time())
+
+        total_events_today = (
+            await db.execute(
+                select(func.count()).select_from(ProductView)
+                .where(ProductView.created_at >= today_start)
+            )
+        ).scalar() or 0
+
+        kw_result = await db.execute(
+            select(SearchLog.keyword, func.count().label("cnt"))
+            .where(SearchLog.created_at >= today_start)
+            .group_by(SearchLog.keyword)
+            .order_by(func.count().desc())
+            .limit(5)
+        )
+        top_keywords_today = [{"keyword": row[0], "count": row[1]} for row in kw_result.all()]
+
+        trending_result = await db.execute(
+            select(Product.id, Product.name, func.count(ProductView.id).label("views"))
+            .join(ProductView, ProductView.product_id == Product.id)
+            .where(ProductView.created_at >= today_start)
+            .group_by(Product.id, Product.name)
+            .order_by(func.count(ProductView.id).desc())
+            .limit(5)
+        )
+        trending_products_today = [
+            {"id": row[0], "name": row[1], "views_today": row[2]}
+            for row in trending_result.all()
+        ]
+    except Exception:
+        pass  # analytics tables may not exist yet on first boot
+
+    return {
+        "total_users": total_users,
+        "total_vendors": total_vendors,
+        "total_products": total_products,
+        "total_orders": total_orders,
+        "revenue": float(revenue),
+        "top_products": top_products,
+        "cart_abandonment_rate": cart_abandonment_rate,
+        "pending_vendor_approvals": pending_vendor_approvals,
+        "pending_product_approvals": pending_product_approvals,
+        "total_events_today": total_events_today,
+        "top_keywords_today": top_keywords_today,
+        "trending_products_today": trending_products_today,
+    }
 
 
 # ─── Coupons ─────────────────────────────────────────────────────────────────

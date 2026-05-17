@@ -256,10 +256,12 @@ class ShopCreate(BaseModel):
     opening_time: Optional[str] = None
     closing_time: Optional[str] = None
     working_days: Optional[List[str]] = None
+    contact_phone: Optional[str] = None
+    whatsapp_number: Optional[str] = None
 
 
 class ShopUpdate(ShopCreate):
-    name: Optional[str]
+    name: Optional[str] = None
 
 
 class ShopResponse(BaseModel):
@@ -281,6 +283,8 @@ class ShopResponse(BaseModel):
     opening_time: Optional[str]
     closing_time: Optional[str]
     working_days: Optional[List[str]]
+    contact_phone: Optional[str] = None
+    whatsapp_number: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -1179,3 +1183,104 @@ class SponsorshipAnalyticsResponse(BaseModel):
     aggregate_clicks: int
     aggregate_views: int
     pending_product_approvals: int
+
+
+# ─── Analytics V2 Schemas ────────────────────────────────────────────────────
+
+class TrackEventData(BaseModel):
+    type: str
+    data: Dict[str, Any] = {}
+
+
+class TrackEventRequest(BaseModel):
+    events: List[TrackEventData]
+
+
+class AnalyticsOverviewV2(BaseModel):
+    period: str
+    start_date: str
+    end_date: str
+    total_views: int = 0
+    total_impressions: int = 0
+    ctr_percentage: float = 0.0
+    total_call_clicks: int = 0
+    total_whatsapp_clicks: int = 0
+    total_direction_clicks: int = 0
+    total_inquiries: int = 0
+    total_wishlist_adds: int = 0
+    total_searches: int = 0
+    view_growth_pct: float = 0.0
+    action_growth_pct: float = 0.0
+
+
+class ProductAnalyticsItem(BaseModel):
+    product_id: int
+    name: str
+    image: Optional[str] = None
+    views: int = 0
+    impressions: int = 0
+    ctr: float = 0.0
+    wishlist_count: int = 0
+    call_clicks: int = 0
+    whatsapp_clicks: int = 0
+    direction_clicks: int = 0
+    last_viewed_at: Optional[str] = None
+
+
+class ProductAnalyticsResponse(BaseModel):
+    items: List[ProductAnalyticsItem]
+    total: int
+    page: int
+    limit: int
+
+
+class SearchKeywordItem(BaseModel):
+    keyword: str
+    count: int
+    result_count_avg: float
+    is_no_result: bool
+
+
+class SearchAnalyticsResponse(BaseModel):
+    top_keywords: List[SearchKeywordItem]
+    no_result_keywords: List[SearchKeywordItem]
+    total_searches: int
+
+
+class ActionBreakdown(BaseModel):
+    action_type: str
+    count: int
+    percentage: float
+
+
+class ActionsAnalyticsResponse(BaseModel):
+    breakdown: List[ActionBreakdown]
+    total_actions: int
+
+
+class DailyPoint(BaseModel):
+    date: str
+    views: int = 0
+    actions: int = 0
+    searches: int = 0
+
+
+class DailyTrafficResponse(BaseModel):
+    series: List[DailyPoint]
+
+
+class InsightResponse(BaseModel):
+    id: int
+    insight_type: str
+    title: str
+    message: str
+    is_read: bool
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class InsightListResponse(BaseModel):
+    items: List[InsightResponse]
+    unread_count: int

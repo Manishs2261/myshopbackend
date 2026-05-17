@@ -25,8 +25,13 @@ from app.core.firebase import init_firebase
 log.info("Core modules loaded. Loading routers...")
 
 # Import all routers
-from app.routers import auth, user, vendor, admin, cart, orders, payments, analytics, reviews, coupons, public, sponsorship, vendor_reviews
-import app.models.sponsorship  # noqa: F401 — registers tables with Base metadata
+from app.routers import (
+    auth, user, vendor, admin, cart, orders, payments, analytics,
+    analytics_v2, reviews, coupons, public, sponsorship, vendor_reviews,
+)
+import app.models.sponsorship   # noqa: F401 — registers tables with Base metadata
+import app.models.analytics     # noqa: F401 — registers analytics tables with Base metadata
+from app.core.scheduler import start_scheduler, stop_scheduler
 
 log.info("All routers loaded.")
 
@@ -43,7 +48,9 @@ async def lifespan(app: FastAPI):
         log.error("Check that DATABASE_URL is set correctly in your environment.")
         raise
     init_firebase()
+    start_scheduler()
     yield
+    stop_scheduler()
     log.info("Shutting down LocalShop API...")
 
 
@@ -153,6 +160,7 @@ app.include_router(cart.router)
 app.include_router(orders.router)
 app.include_router(payments.router)
 app.include_router(analytics.router)
+app.include_router(analytics_v2.router)
 app.include_router(reviews.router)
 app.include_router(coupons.router)
 app.include_router(vendor.router)

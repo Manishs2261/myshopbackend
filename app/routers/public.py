@@ -48,7 +48,8 @@ def _shop_snapshot(vendor, shop) -> dict:
     return {
         "vendor_id": vendor.id,
         "shop_name": (shop.name if shop and shop.name else vendor.business_name) or "",
-        "shop_phone": vendor.business_phone or "",
+        "shop_phone": (shop.contact_phone if shop and shop.contact_phone else None) or vendor.business_phone or "",
+        "shop_whatsapp": shop.whatsapp_number if shop and shop.whatsapp_number else None,
         "shop_lat": float(shop.latitude) if shop and shop.latitude else None,
         "shop_lng": float(shop.longitude) if shop and shop.longitude else None,
         "shop_city": shop.city if shop else None,
