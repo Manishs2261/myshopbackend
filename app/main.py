@@ -28,6 +28,7 @@ log.info("Core modules loaded. Loading routers...")
 from app.routers import (
     auth, user, vendor, admin, cart, orders, payments, analytics,
     analytics_v2, reviews, coupons, public, sponsorship, vendor_reviews,
+    admin_analytics,
 )
 import app.models.sponsorship   # noqa: F401 — registers tables with Base metadata
 import app.models.analytics     # noqa: F401 — registers analytics tables with Base metadata
@@ -165,6 +166,7 @@ app.include_router(reviews.router)
 app.include_router(coupons.router)
 app.include_router(vendor.router)
 app.include_router(admin.router)
+app.include_router(admin_analytics.router)
 app.include_router(sponsorship.router)
 app.include_router(vendor_reviews.router)
 

@@ -119,3 +119,39 @@ class VendorInsight(Base):
     __table_args__ = (
         Index("ix_vendor_insights_vendor_read_date", "vendor_id", "is_read", "created_at"),
     )
+
+
+class AdminInsight(Base):
+    __tablename__ = "admin_insights"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # trending | growth | alert | warning | info
+    insight_type = Column(String(50), nullable=False)
+    title = Column(String(500), nullable=False)
+    message = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+    metadata_json = Column(Text)  # JSON string for additional metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_admin_insights_read_date", "is_read", "created_at"),
+    )
+
+
+class FraudLog(Base):
+    __tablename__ = "fraud_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # ip_velocity | session_spam | search_spam
+    fraud_type = Column(String(50), nullable=False)
+    ip_address = Column(String(50))
+    session_id = Column(String(100))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    event_count = Column(Integer, default=0)
+    details = Column(Text)  # JSON string
+    is_resolved = Column(Boolean, default=False)
+    detected_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_fraud_logs_type_date", "fraud_type", "detected_at"),
+    )
